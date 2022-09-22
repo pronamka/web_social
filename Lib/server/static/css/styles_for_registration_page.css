@@ -1,0 +1,169 @@
+@font-face {
+  font-family: "centurygothic";
+  font-style: normal;
+  font-weight: 400;
+  src: local("centurygothic"),
+       url("/fonts/centurygothic.ttf") format("ttf"),
+       url("/fonts/centurygothic.ttf") format("ttf");
+}
+@media (max-width: 20000px){
+	.container{
+		width: 480px;
+		margin-top: 50px;
+		margin-left: -4px;
+		display: inline-block;
+	}
+	.container p{
+		margin-left: 53px;
+	}
+	#logo_container{
+		display: inline-block;
+		width: 700px;
+		margin-left: 200px;
+		margin-top: 50px;
+	}
+	#create_account_button{
+		margin-top: 5px;
+		margin-left: 31px;
+	}
+@media (max-width: 2000px){
+	.container{
+		width: 480px;
+		margin-top: 50px;
+		margin-left: -4px;
+		display: inline-block;
+	}
+	.container p{
+		margin-left: 53px;
+	}
+	#logo_container{
+		display: inline-block;
+		width: 700px;
+		margin-left: 200px;
+		margin-top: 50px;
+	}
+	#create_account_button{
+		margin-top: 5px;
+		margin-left: 31px;
+	}
+@media (max-width: 1200px){
+	.container{
+		width: 70%;
+		margin-left: auto;
+		margin-right: auto;
+		display: block;
+		margin-top: -20px;
+	}
+	#logo_container{
+		width: 70%;
+		margin-left: auto;
+		margin-right: auto;
+		display: block;
+	}
+}
+@media (max-width: 767px){
+	.container{
+		width: 90%;
+		margin-top: -20px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	#logo_container{
+		width: 90%;
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+@media (max-width: 500px){
+	.container{
+		width: 90%;
+		margin-top: -20px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	.container i{
+		display: none;
+	}
+	.in_content{
+		margin-left: 5%;
+		margin-right: 5%;
+	}
+	#create_account_button{
+		margin-top: 5px;
+		margin-right: 5%;
+		margin-left: 6%;
+	}
+	#logo_container{
+		width: 90%;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	.container p{
+		margin-left: 5%;
+		margin-right: 5%;
+		text-align: center;
+	}
+}
+@media (max-width: 350px){
+	#create_account_button{
+		margin-top: 5px;
+		margin-right: 5%;
+		margin-left: 9%;
+	}
+}
+body{
+	background-image: url(geometric_background.jpg);
+	width: auto;
+	height: auto;
+}
+.container{
+	max-width: 10000px;
+	background-color: white;
+	align-items: center;
+	font-family: 'centurygothic';
+	height: 400px;
+	vertical-align: top;
+}
+.container h2{
+	margin-left: 20px;
+	padding-top: 10px;
+}
+
+.container i{
+	margin-left: 10px;
+}
+.info{
+	margin: 2px;
+	height: 40px;
+	width: 80%;
+	margin-left: 20px;
+}
+#create_account_button{
+	width: 81%;
+	height: 30px;
+	font-size: large;
+	color: whitesmoke;
+	background-color: #4682B4;
+}
+#create_account_button:hover{
+	background-color: #0000CD;
+	cursor: pointer;
+}
+#logo_container{
+	background-color: lightblue;
+	max-width: 70000px;
+	height: 400px;
+}
+#logo_container p{
+	margin-left: 10%;
+	padding-top: 10px;
+	text-decoration: underline;
+	text-shadow: 2px;
+	font-size: x-large;
+	font-family: 'centurygothic';
+}
+#logo_container li{
+	font-size: large;
+	margin-top: 10px;
+	font-family: 'centurygothic';
+}

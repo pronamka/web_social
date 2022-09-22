@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Weblogins</title>
+    <link rel='stylesheet' type="text/css" href="{{ url_for('static',  filename='css/styles_for_registration_page.css') }}">
+    <meta name="viewport" content="width=device-width">
+</head>
+<body>
+<div class="wrapper_weblogins">
+    <div id="logo_container">
+        <p>Pronamka's service for joint scintific work</p>
+        <p>Lorem ispum</p>
+        <ol>
+            <li>Post</li>
+            <li>Comment</li>
+            <li>Lorem ispum</li>
+        </ol>
+    </div>
+    <div class="container">
+        <div class="in_content">
+            <h2>Create your account</h2>
+            <form action="" method="post">
+                <i class="fa-solid fa-user"></i>
+                <input name="login" placeholder="login" type="text" class="info"><br>
+                <i class="fa-solid fa-lock"></i>
+                <input name="password" placeholder="password" type="password" class="info"><br>
+                <i class="fa-solid fa-envelope-open"></i>
+                <input name="email" placeholder="email" type="email" class="info"><br>
+                <input type="submit" value="Submit" onclick="tell();" id="create_account_button">
+            </form>
+            <p>{{errors}}</p>
+
+            <p>Already have an account? <a href="/log_in_page">Log in</a></p>
+            <script>
+                function tell() {
+                alert('We have sent a confirmation email to you. Please, check it.');
+                }
+            </script>
+        </div>
+    </div>
+</div>
+</body>
+</html>
