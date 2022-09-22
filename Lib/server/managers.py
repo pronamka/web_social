@@ -1,7 +1,7 @@
 from ast import literal_eval
 from datetime import datetime
-from Lib.updates.database import DataBase
-from Lib.updates.post import Post
+from Lib.server.database import DataBase
+from Lib.server.post import Post
 
 
 class Manager:

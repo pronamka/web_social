@@ -3,9 +3,13 @@ from flask_login import login_required
 from flask import session
 from typing import Union
 from threading import Thread
-from Lib.updates.core_app import app, login_manager, user
-from Lib.updates.processes import RegistrationHandler, LogInHandler
-from Lib.updates.utils import UsersObserver
+from Lib.server.app_core import app, login_manager, user
+from Lib.server.processes import RegistrationHandler, LogInHandler
+from Lib.server.utils import UsersObserver
+
+# Load personal page
+# Add different pages and features for users and admins
+# Add curse-comment ban system
 
 temp = {}  # a very bad solution, should solve this resend email problem somehow else
 Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
@@ -77,10 +81,15 @@ def log_in_page() -> Union[Response, str]:
         return log_in()
 
 
-@app.route('/personal_page')
+@app.route('/personal_page', methods=['GET', 'POST'])
 @login_required
 def personal_page():
-    return render_template('Prototype.html', login=user.login)
+    if request.method == 'GET':
+        return render_template('Prototype.html', login=user.login)
+
+
+def load_main_page():
+
 
 
 app.run('0.0.0.0', port=4000, debug=True)

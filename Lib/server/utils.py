@@ -1,7 +1,6 @@
 from datetime import datetime
 from time import sleep
-from threading import Thread
-from Lib.updates.managers import Manager
+from Lib.server.managers import Manager
 
 
 class UsersObserver(Manager):
@@ -20,7 +19,7 @@ class UsersObserver(Manager):
     def _check_on_loop(self):
         current_time = datetime.now().strftime('%H:%M')
         for i in self._get_users():
-            if self._manage_time(i[0]) < current_time:
+            if self._manage_time(i[1]) < current_time:
                 self.database.delete(f"DELETE FROM users WHERE id='{i[0]}'")
 
     def _get_users(self):
@@ -35,5 +34,3 @@ class UsersObserver(Manager):
         else:
             comparison_time = str(int(comparison_time.split(':')[0]) + 1) + ':' + comparison_time.split(':')[1]
         return comparison_time
-
-

@@ -1,8 +1,8 @@
 import sqlite3
 from enum import Enum
 from flask_login import UserMixin
-from Lib.updates.managers import SubscriptionManager, UserPosts
-from Lib.updates.database import DataBase
+from Lib.server.managers import SubscriptionManager, UserPosts
+from Lib.server.database import DataBase
 
 
 class UserAccountState(Enum):

@@ -7,9 +7,9 @@ from itsdangerous.exc import BadTimeSignature
 from typing import Union
 from enum import Enum
 from datetime import datetime
-from Lib.updates.core_app import app, user
-from Lib.updates.managers import Manager
-from Lib.updates.database import DataBase
+from Lib.server.app_core import app, user
+from Lib.server.managers import Manager
+from Lib.server.database import DataBase
 
 
 class RegistrationState(Enum):

@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_login import LoginManager
-from Lib.updates.user import User
+from Lib.server.user import User
 
 app = Flask(__name__)
 app.config['SECURITY_PASSWORD_SALT'] = 'salt'

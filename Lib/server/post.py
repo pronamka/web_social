@@ -1,4 +1,4 @@
-from Lib.updates.database import DataBase
+from Lib.server.database import DataBase
 
 
 class Post:
