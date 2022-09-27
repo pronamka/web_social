@@ -3,13 +3,19 @@ from flask_login import login_required
 from flask import session
 from typing import Union
 from threading import Thread
-from Lib.server.app_core import app, login_manager, user
-from Lib.server.processes import RegistrationHandler, LogInHandler
+from Lib.server import app_core
+from Lib.server.app_core import app, login_manager
+from Lib.server.processes import RegistrationHandler, LogInHandler, PrivatePage
 from Lib.server.utils import UsersObserver
 
+# Fix everything s oit works with new user system
+#
+#
 # Load personal page
-# Add different pages and features for users and admins
-# Add curse-comment ban system
+#   Add different pages and features for users and admins
+#   Add curse-comment ban system
+#   Add preferences system based on posts tags
+# Add getters and setters instead of changing arguments directly
 
 temp = {}  # a very bad solution, should solve this resend email problem somehow else
 Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
@@ -17,8 +23,8 @@ Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users c
 
 @login_manager.user_loader
 def load_user(user_id: str):
-    if int(user_id) == user.id:
-        return user
+    if int(user_id) == app_core.user.user_id:
+        return app_core.user
     else:
         return None
 
@@ -62,7 +68,7 @@ def log_in() -> Union[Response, str]:
     if status[0].value == 2:
         return redirect(url_for('personal_page'))
     elif status[0].value == 3:
-        return render_template('log_in_page.html', already_logged_in=True, name=session.get(user.login))
+        return render_template('log_in_page.html', already_logged_in=True, name=session.get(app_core.user.login))
     else:
         return render_template('log_in_page.html', errors=status[1])
 
@@ -85,11 +91,7 @@ def log_in_page() -> Union[Response, str]:
 @login_required
 def personal_page():
     if request.method == 'GET':
-        return render_template('Prototype.html', login=user.login)
-
-
-def load_main_page():
-
+        return render_template('private_page.html', login=app_core.user.login, post_settings=PrivatePage)
 
 
 app.run('0.0.0.0', port=4000, debug=True)

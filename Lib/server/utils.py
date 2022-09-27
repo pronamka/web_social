@@ -23,7 +23,7 @@ class UsersObserver(Manager):
                 self.database.delete(f"DELETE FROM users WHERE id='{i[0]}'")
 
     def _get_users(self):
-        users = self.database.get_all("SELECT id, registration_date FROM users WHERE is_activated='0'")
+        users = self.database.get_all("SELECT id, registration_date FROM users WHERE status='0'")
         return users
 
     @staticmethod

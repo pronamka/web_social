@@ -1,31 +1,82 @@
 from sqlite3 import connect, Error as db_Error
+from enum import Enum
 from typing import Callable, Union
+
+
+class NoPermission(PermissionError):
+    def __init__(self, func: Callable, arguments: tuple):
+        self.message = f"Failed to call {func} with {arguments} - No permission. \n" \
+                               f"If you encountered this error, please contact us at defender0508@gmeail.com."
+
+    def __str__(self):
+        return self.message
+
+
+class InternalError(TypeError):
+    def __init__(self, func: Callable, arguments: tuple, error: TypeError):
+        self.message = f"Failed to call {func} with {arguments}.\n" \
+                              f"Function responded with '{error}'.\n" \
+                              f"If you encountered this error, please contact us at defender0508@gmeail.com."
+
+    def __str__(self):
+        return self.message
+
+
+class DataBaseInteractError(db_Error):
+    def __init__(self, func: str, arguments: tuple, error: db_Error):
+        self.message = f"Failed to call {func} method of {arguments[0]} with parameters {arguments[1:-1]}.\n" \
+                       f"Error while interacting with database: {error}. \n" \
+                        f"If you encountered this error, please contact us at defender0508@gmeail.com."
+
+    def __str__(self):
+        return self.message
+
+
+class AccessLevel(Enum):
+    """Higher levels can also do actions of all the previous levels."""
+    Browse = 1
+    Create = 2
+    Update = 3
+    Delete = 4
+
+
+operations_access_required = {'get_information': AccessLevel(1),
+                              'get_many': AccessLevel(1),
+                              'get_all': AccessLevel(1),
+                              'get_all_singles': AccessLevel(1),
+                              'create': AccessLevel(2),
+                              'update': AccessLevel(3),
+                              'delete': AccessLevel(4)}
 
 
 def safe_execution(func: Callable) -> Union[AssertionError, Callable]:
     """Catches the errors, if they occur while interacting with database.
+    Ensures that given DataBase instance has enough rights to execute the sql query.
     Use this function as a decorator for class methods."""
+
     def wrapper(*args, **kwargs):
-        sql = args[1]
-        try:
-            return func(args[0], sql, kwargs)
-        except TypeError as error:
-            assert False, f"Failed to call {func} with {(args[0], sql, kwargs)}.\n" \
-                          f"Function responded with '{error}'.\n" \
-                          f"If you encountered this error, please contact us at defender0508@gmeail.com"
-        except db_Error as error:
-            assert False, f"Failed to call {func} with {(args[0], sql, kwargs)} - Error while interacting with \n" \
-                          f"database: {error}. \n" \
-                          f"If you encountered this error, please contact us at defender0508@gmeail.com"
+        if args[0].get_access_level.value >= operations_access_required.get(f'{func}'.split(' ', 2)[1][9:]).value:
+            sql = args[1]
+            try:
+                return func(args[0], sql, kwargs)
+            except TypeError as error:
+                raise InternalError(func, (args, kwargs), error)
+            except db_Error as error:
+                raise DataBaseInteractError(f'{func}'.split(' ', 2)[1][9:], (args, kwargs), error)
+        else:
+            raise NoPermission(func, (args, kwargs))
+
     return wrapper
 
 
 class DataBase:
     """Class for safely interacting with database."""
-    def __init__(self) -> None:
+
+    def __init__(self, database_name: str = 'web_social_v2.db', access_level: int = 1) -> None:
         """Establishing database connection and creating a cursor object"""
-        self.connection = connect('web_social.db', check_same_thread=False)
+        self.connection = connect(database_name, check_same_thread=False)
         self.cursor = self.connection.cursor()
+        self.access = AccessLevel(access_level)
 
     @safe_execution
     def get_information(self, sql: str, *args) -> tuple:
@@ -72,3 +123,16 @@ class DataBase:
         """Delete something in database"""
         self.cursor.execute(sql)
         self.connection.commit()
+
+    @property
+    def get_access_level(self):
+        return self.access
+
+    def __setattr__(self, key, value):
+        if hasattr(self, key):
+            raise PermissionError('DataBase attributes cannot be changed.')
+        else:
+            self.__dict__[key] = value
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}(access_level={self.access})'

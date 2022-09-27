@@ -7,9 +7,12 @@ from itsdangerous.exc import BadTimeSignature
 from typing import Union
 from enum import Enum
 from datetime import datetime
-from Lib.server.app_core import app, user
-from Lib.server.managers import Manager
+from Lib.server.post import PostForDisplay
+from Lib.server.user import UserFactory
+from Lib.server.managers import Manager, BasicManager
 from Lib.server.database import DataBase
+from Lib.server.app_core import app
+from Lib.server import app_core
 
 
 class RegistrationState(Enum):
@@ -28,51 +31,79 @@ class LogInState(Enum):
     UserAlreadyLoggedIn = 3
 
 
+class PrivatePage:
+    def __init__(self) -> None:
+        if app_core.user.get_role == 1:
+            self.latest_posts = PostRegistry.get_others_latest_posts()
+        elif app_core.user.get_role == 2:
+            self.latest_posts, self.my_latest_posts = PostRegistry.get_data()
+        elif app_core.user.get_role == 3:
+            # specific features for admin should be added
+            self.latest_posts, self.my_latest_posts = PostRegistry.get_data()
+
+
+class PostRegistry(BasicManager):
+
+    @classmethod
+    def get_data(cls) -> tuple:
+        return cls.get_others_latest_posts(), cls.get_my_latest_posts()
+
+    @classmethod
+    def get_others_latest_posts(cls) -> list:
+        post_ids = cls.database.get_all_singles(f'SELECT MAX(post_id) FROM posts WHERE user_id '
+                                                f'IN ({", ".join(i for i in [app_core.user.SubscriptionManger.get_follows])})')
+        return list(map(PostForDisplay, post_ids))
+
+    @classmethod
+    def get_my_latest_posts(cls):
+        return app_core.user.PostManager.get_last_posts(5)
+
+
 class LogInHandler(Manager):
     """Class for conducting the logging in process"""
     _error_messages = {0: 'Wrong credentials', 1: 'You must fill all the fields', 3: True}
+    _actions = {1: UserFactory.create_viewer, 2: UserFactory.create_author, 3: UserFactory.create_admin}
 
     def __init__(self) -> None:
         super(LogInHandler, self).__init__()
         self.status = None
         self.login = None
 
-    @staticmethod
-    def force_log_in(login: str) -> None:
+    def force_log_in(self, login: str) -> None:
         """Log in a user without doing any verification.
         Used to re-login user if he already has an active session"""
-        session.pop(user.login)
-        user.__init__(login)
-        login_user(user)
-        session[login] = login
+        session.pop(app_core.user.get_int_id)
+        self._add_to_session(login)
 
     def log_user(self) -> tuple:
-        """General function that launches all the processes of logging in
-        :returns: tuple of enum LogInState class and None/string"""
+        """General function that launches all the processes of logging in"""
         self.login = request.form.get('login')
         log_in_state = self._check_properties()
         if log_in_state == LogInState.CredentialsFine:
-            return self._add_to_session(), None
+            return self._add_to_session(self.login), None
         else:
             return log_in_state, self._error_messages.get(log_in_state.value)
 
-    def _add_to_session(self):
+    def _find_by_login(self, login: str) -> tuple[int, int]:
+        return self.database.get_information(f'SELECT id, role FROM users WHERE login="{login}"')
+
+    def _add_to_session(self, login: str) -> LogInState:
         """Update the user object,
-        log it in so it can pass through @login_required and add it to session.
-        :returns: enum LogInState class"""
-        user.__init__(self.login)
-        login_user(user)
+        log it in so it can pass through @login_required and add it to session."""
+        info = self._find_by_login(login)
+        app_core.user = self._actions.get(info[1])(info[0])
+        print(app_core.user)
+        login_user(app_core.user)
         session[self.login] = self.login
         return LogInState.CredentialsFine
 
     def _check_properties(self) -> LogInState:
-        """Check if all the user-given data is alright.
-        :returns: enum LogInState class"""
+        """Check if all the user-given data is alright."""
         if self.login == '':
             return LogInState.FieldsNotFilled
         elif self._find_user() == LogInState.WrongCredentials or self._check_password() is False:
             return LogInState.WrongCredentials
-        elif self._check_if_user_logged_in() is not True:
+        elif self._check_if_user_logged_in() is False:
             return LogInState.UserAlreadyLoggedIn
         else:
             return LogInState.CredentialsFine
@@ -81,14 +112,16 @@ class LogInHandler(Manager):
     def _check_if_user_logged_in() -> bool:
         """Check whether the user logged in already.
         :returns: True if user is not logged in yet, False if he is."""
-        if user.login not in session:
-            return True
+        if hasattr(app_core.user, 'login'):
+            if app_core.user.login not in session:
+                return True
+            else:
+                return False
         else:
-            return False
+            return True
 
     def _find_user(self) -> LogInState:
-        """Check if the user wth given login exist.
-        :returns: enum LogInState class"""
+        """Check if the user wth given login exist."""
         if not self.database.get_information(f"SELECT login FROM users WHERE login='{self.login}'"):
             return LogInState.WrongCredentials
         else:
@@ -105,8 +138,9 @@ class LogInHandler(Manager):
 
 class RegistrationHandler(Manager):
     """Class for conducting the registration process."""
+
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__(2)
         self.login: str = request.form.get('login')
         self.password: str = request.form.get('password')
         self.email: str = request.form.get('email')
@@ -178,6 +212,7 @@ class Token:
     You do not need to create instances of this class to use it."""
 
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])  # this object is used to create and check tokens
+    database = DataBase(access_level=3)
 
     @classmethod
     def create_token(cls, user_id: int) -> str:
@@ -186,13 +221,11 @@ class Token:
 
     @classmethod
     def check_token(cls, token: str, expiration=1800) -> bool:
-        # in development (there is no way for a user whose link is expired to activate his account)
-        # accounts of users, who did not confirm their accounts in an hour should be deleted
         """Check if a token is right and has not expired yet."""
         try:
             user_id_credentials = cls.serializer.loads(token, salt=app.config['SECURITY_PASSWORD_SALT'],
                                                        max_age=expiration)
-            DataBase().update(f'''UPDATE users SET is_activated="1" WHERE id="{user_id_credentials}"''')
+            cls.database.update(f'''UPDATE users SET status="1" WHERE id="{user_id_credentials}"''')
             return True
         except BadTimeSignature:
             return False
@@ -200,6 +233,7 @@ class Token:
 
 class EmailConfirmationHandler(Manager):
     """Class for conducting the process of email confirmation."""
+
     def __init__(self, login: str, email: str) -> None:
         super().__init__()
         self.email_manager = Mail(app)
@@ -239,3 +273,5 @@ class EmailConfirmationHandler(Manager):
     def _get_by_login(self) -> int:
         """Get user id from login."""
         return self.database.get_information(f"SELECT id FROM users WHERE login='{self.login}'")[0]
+
+

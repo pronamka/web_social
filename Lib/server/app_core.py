@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_login import LoginManager
-from Lib.server.user import User
+from flask_login import AnonymousUserMixin
 
 app = Flask(__name__)
 app.config['SECURITY_PASSWORD_SALT'] = 'salt'
@@ -15,4 +15,4 @@ app.config['MAIL_PASSWORD'] = 'dnqqunaesokbfrok'
 login_manager = LoginManager(app)
 login_manager.session_protection = 'strong'
 
-user = User('0')
+user = AnonymousUserMixin()
