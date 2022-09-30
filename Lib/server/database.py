@@ -42,6 +42,7 @@ class AccessLevel(Enum):
 
 operations_access_required = {'get_information': AccessLevel(1),
                               'get_many': AccessLevel(1),
+                              'get_many_singles': AccessLevel(1),
                               'get_all': AccessLevel(1),
                               'get_all_singles': AccessLevel(1),
                               'create': AccessLevel(2),
@@ -103,6 +104,15 @@ class DataBase:
         Unlike get_all() this function returns unpacked values.
         They can still be tuples, if they are stored as tuples in database."""
         return [i[0] for i in self.cursor.execute(sql).fetchall()]
+
+    @safe_execution
+    def get_many_singles(self, sql: str, *args) -> list:
+        """Returns a list containing defined amount of tuples. Default amount= 1."""
+        if args:
+            size = args[0].get('size')
+        else:
+            size = 1
+        return [i[0] for i in self.cursor.execute(sql).fetchmany(size)]
 
     @safe_execution
     def create(self, sql: str, *args) -> None:

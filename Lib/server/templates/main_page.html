@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}{{session.get('login')}}'s page{% endblock %}
+{% block content %}
+<meta name="viewport" content="width=device-width">
+<main role="main">
+    <article>
+        <div class="wrapper">
+            <div class="notes">
+                <div id="latest_subscribed_to_posts">
+                    <p>{{errors2}}</p>
+                    <h2>Latest post of every <br>
+                        person you are subscribed to:</h2>
+                        {% for one_post in all_subbed_to_posts %}
+                            <object class="table_cell">
+                                <iframe src="{{ url_for('static', filename= one_post.get_path) }}"
+                                        width="150px" height="200px" id="preview"></iframe>
+                            </object>
+                            <div class="for_preview">
+                                <p class="post_name">
+                                <a href="{{ url_for('view_post', post_id=one_post.get_id) }}">
+                                    {{ one_post.get_title }}</a></p><br><p class="person_name">by {{ one_post.get_author}}</p>
+                            </div>
+                        {% endfor %}
+                    <p style="font-size: x-large; font-family: 'Evanston Tavern 1826'">{{ no_posts }}</p>
+                </div>
+                <div id="latest_subscribed_to_posts_little_screen">
+                    <p>{{errors2}}</p>
+                    <h2>Latest post of every <br>
+                        person you are subscribed to:</h2>
+                    {% for one_post in all_subbed_to_posts %}
+                        <object class="table_cell">
+                            <p><iframe src="{{ url_for('static', filename= one_post.get_path) }}"
+                                       width="200px" height="300px" id="preview_little_screen" align="bottom"></iframe>
+                                <br>
+                                <a href="{{ url_for('view_post', post_id=one_post.get_id) }}"
+                                   class="post_name">
+                                    {{ one_post.get_title}}</a><br><i class="person_name1">by {{ one_post.get_author}}</i></p>
+                        </object>
+                    {% endfor %}
+                    <p style="font-size: x-large; font-family: 'Evanston Tavern 1826'">{{ no_posts }}</p>
+                </div>
+                <div class="vertical_line3"></div>
+                <div id="latest_posts">
+                    <p>{{errors2}}</p>
+                    <h2>Latest posts</h2>
+                        {% for post in posts %}
+                                <p class="all_comments1"><a href="{{ url_for('render_post_page', login=login, post_name=post['title'], _external=True) }}">{{post['title']}} </a><br><i>by {{post['login']}} on {{post['date']}}</i></p>
+                        {% endfor %}
+                </div>
+            </div>
+        </div>
+    </article>
+</main>
+{% endblock %}

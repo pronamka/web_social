@@ -30,11 +30,12 @@
                         <a onclick="cancel();">×</a>
                     </span>
                 </div>
-                <div class="modal__body" data-modal="content">You are already logged in as {{ name }}<br>
+                <div class="modal__body" data-modal="content">You are already logged in as 
+                    {{ logged_as }}<br>
                 Log in anyways? (Your previous session will be closed)</div>
                 <div class="modal__footer">
                     <button onclick="cancel();" class="modal_cancel_button">Cancel</button>
-                    <form action="/log_in_anyways/{{ name }}">
+                    <form action="/log_in_anyways/{{ name }}" method="get">
                         <button onclick="ok();">Ok</button>
                     </form>
                 </div>

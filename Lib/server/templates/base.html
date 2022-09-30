@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename= 'css/stylesForPrivatePage.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename= 'css/styles_for_Prototype.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename= 'css/styles_for_Personalization_page.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename= 'css/styles_for_Manage_posts_page.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.0.0-web/css/all.css') }}">
+    <script type="text/javascript" src="{{ url_for('static', filename='js/for_test.js') }}"></script>
+    <meta name="viewport" content="width=device-width">
+</head>
+<body>
+<input type="checkbox" id="nav-toggle" hidden>
+<nav class="nav">
+    <label for="nav-toggle" class="nav-toggle" onclick></label>
+    <h2 class="logo">{{session.get('login')}}</h2>
+    <img src="{{ url_for('static', filename= '/avatar_images/' + session.get('id') + '.jpeg') }}" class="avatar">
+    <p id="status">Status: online</p>
+    <form action="/log_out" method="get" id="log_out_block">
+        <input type="submit" name="log_out" value="Log out" width="100px">
+    </form>
+    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+    <ul>
+        <li>
+            <button><a href="{{ url_for('personal_page')}}">Hub</a></button>
+
+        </li>
+        <li>
+            <form action="/private/{{login}}/personalization_page" method="post">
+                <input type="submit" value="Personalization" name="go_to_personalization_page">
+            </form>
+        </li>
+        <li>
+            <form action="/private/{{login}}/manage_posts_page" method="post">
+                <input type="submit" name="go_to_manage_posts_page" value="Manage posts">
+            </form>
+        </li>
+        <li>
+            <form action="" method="post">
+                <input type="submit" name="go_to_manage_posts_page" value="Ask administrator">
+            </form>
+        </li>
+    </ul>
+</nav>
+{% block content %}{% endblock %}
+</body>
+</html>

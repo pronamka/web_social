@@ -2,7 +2,7 @@ from datetime import datetime
 from ast import literal_eval
 from abc import ABC
 from Lib.server.database import DataBase
-from Lib.server.post import Post
+from Lib.server.posts import Post
 
 
 class Manager(ABC):
@@ -30,6 +30,19 @@ class PostManager(Manager):
 
     def delete_post(self, post_id: int) -> None:
         self.database.delete(f"""DELETE FROM posts WHERE post_id='{post_id}'""")
+
+
+class PostRegistry:
+    database = DataBase()
+
+    def __init__(self, post_ids: list) -> None:
+        self.posts = self._build_posts(post_ids)
+        self.post_manger = PostManager(4)
+        self.count = 0
+
+    @classmethod
+    def _build_posts(cls, post_ids: list):
+        posts = cls.database.get_all('SELECT ')
 
 
 class UserPostManager(UserManager):

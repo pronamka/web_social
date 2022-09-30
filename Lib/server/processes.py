@@ -1,18 +1,24 @@
+from typing import Union
+from enum import Enum
+from datetime import datetime
+
 from flask import request, render_template, url_for, session
 from flask_login import login_user
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer
 from itsdangerous.exc import BadTimeSignature
-from typing import Union
-from enum import Enum
-from datetime import datetime
-from Lib.server.post import PostForDisplay
-from Lib.server.user import UserFactory
-from Lib.server.managers import Manager, BasicManager
+
+from Lib.server.app_core import app, users
 from Lib.server.database import DataBase
-from Lib.server.app_core import app
-from Lib.server import app_core
+from Lib.server.posts import PostForDisplay
+from Lib.server.user import UserFactory, Viewer, Author, Admin, UserRole
+from Lib.server.managers import Manager, BasicManager
+
+
+def get_user() -> [Viewer, Author, Admin]:
+    """Get the user object that corresponds with the client machine"""
+    return users.get(session.get('login'))
 
 
 class RegistrationState(Enum):
@@ -25,43 +31,55 @@ class RegistrationState(Enum):
 
 class LogInState(Enum):
     """Represents possible conditions of the process of logging in"""
-    WrongCredentials = 0
-    FieldsNotFilled = 1
-    CredentialsFine = 2
-    UserAlreadyLoggedIn = 3
+    WrongCredentials = 1
+    UserAlreadyLoggedIn = 2
+    CredentialsFine = 3
+    AdminUser = 4
 
 
 class PrivatePage:
     def __init__(self) -> None:
-        if app_core.user.get_role == 1:
+        if get_user().get_role.value == 1:
             self.latest_posts = PostRegistry.get_others_latest_posts()
-        elif app_core.user.get_role == 2:
+        elif get_user().get_role.value == 2:
             self.latest_posts, self.my_latest_posts = PostRegistry.get_data()
-        elif app_core.user.get_role == 3:
+        elif get_user().get_role.value == 3:
             # specific features for admin should be added
             self.latest_posts, self.my_latest_posts = PostRegistry.get_data()
 
+    @property
+    def get_latest_post(self) -> list:
+        return self.latest_posts
+
 
 class PostRegistry(BasicManager):
+    """An object for getting information needed to display a post"""
 
     @classmethod
     def get_data(cls) -> tuple:
+        """Get both latest post of users who the current user is subscribed to
+                and his own latest posts."""
         return cls.get_others_latest_posts(), cls.get_my_latest_posts()
 
     @classmethod
-    def get_others_latest_posts(cls) -> list:
-        post_ids = cls.database.get_all_singles(f'SELECT MAX(post_id) FROM posts WHERE user_id '
-                                                f'IN ({", ".join(i for i in [app_core.user.SubscriptionManger.get_follows])})')
-        return list(map(PostForDisplay, post_ids))
+    def get_others_latest_posts(cls) -> [str, list]:
+        """Get latest post of users who the current user is subscribed to."""
+        follows = get_user().SubscriptionManger.get_follows
+        if follows:
+            post_ids = cls.database.get_all_singles(f'SELECT MAX(post_id) FROM posts WHERE user_id IN '
+                                                    f'({", ".join(str(i) for i in follows)})')
+            return list(map(PostForDisplay, post_ids))
+        else:
+            return 'None of people who you follow have made a post.'
 
     @classmethod
-    def get_my_latest_posts(cls):
-        return app_core.user.PostManager.get_last_posts(5)
+    def get_my_latest_posts(cls) -> list:
+        """Get latest post of a current user"""
+        return get_user().PostManager.get_last_posts(5)
 
 
 class LogInHandler(Manager):
     """Class for conducting the logging in process"""
-    _error_messages = {0: 'Wrong credentials', 1: 'You must fill all the fields', 3: True}
     _actions = {1: UserFactory.create_viewer, 2: UserFactory.create_author, 3: UserFactory.create_admin}
 
     def __init__(self) -> None:
@@ -72,53 +90,55 @@ class LogInHandler(Manager):
     def force_log_in(self, login: str) -> None:
         """Log in a user without doing any verification.
         Used to re-login user if he already has an active session"""
-        session.pop(app_core.user.get_int_id)
-        self._add_to_session(login)
+        users.pop(session.get('login'))
+        self._log_in(login)
 
     def log_user(self) -> tuple:
         """General function that launches all the processes of logging in"""
         self.login = request.form.get('login')
-        log_in_state = self._check_properties()
-        if log_in_state == LogInState.CredentialsFine:
-            return self._add_to_session(self.login), None
-        else:
-            return log_in_state, self._error_messages.get(log_in_state.value)
+        self._check_properties()
+        if self.status.value >= 3:
+            self._log_in(self.login)
+        return self.status
+
+    def _log_in(self, login: str) -> LogInState:
+        """Update the user object,
+        log it in so it can pass through @login_required and add it to session."""
+        info = self._find_by_login(login)
+        # noinspection PyArgumentList
+        users[login] = self._actions.get(info[1])(info[0])
+        self._add_to_session(login)
+        return LogInState.CredentialsFine
+
+    def _add_to_session(self, login: str) -> None:
+        login_user(users.get(login))
+        session['login'] = login
+        session['id'] = '2'
+        self._check_if_admin()
 
     def _find_by_login(self, login: str) -> tuple[int, int]:
         return self.database.get_information(f'SELECT id, role FROM users WHERE login="{login}"')
 
-    def _add_to_session(self, login: str) -> LogInState:
-        """Update the user object,
-        log it in so it can pass through @login_required and add it to session."""
-        info = self._find_by_login(login)
-        app_core.user = self._actions.get(info[1])(info[0])
-        print(app_core.user)
-        login_user(app_core.user)
-        session[self.login] = self.login
-        return LogInState.CredentialsFine
+    def _check_if_admin(self):
+        if get_user().get_role == UserRole.Admin:
+            self.status = LogInState.AdminUser
 
-    def _check_properties(self) -> LogInState:
+    def _check_properties(self) -> None:
         """Check if all the user-given data is alright."""
-        if self.login == '':
-            return LogInState.FieldsNotFilled
-        elif self._find_user() == LogInState.WrongCredentials or self._check_password() is False:
-            return LogInState.WrongCredentials
+        if self._find_user() == LogInState.WrongCredentials or self._check_password() is False:
+            self.status = LogInState.WrongCredentials
         elif self._check_if_user_logged_in() is False:
-            return LogInState.UserAlreadyLoggedIn
+            self.status = LogInState.UserAlreadyLoggedIn
         else:
-            return LogInState.CredentialsFine
+            self.status = LogInState.CredentialsFine
 
-    @staticmethod
-    def _check_if_user_logged_in() -> bool:
+    def _check_if_user_logged_in(self) -> bool:
         """Check whether the user logged in already.
         :returns: True if user is not logged in yet, False if he is."""
-        if hasattr(app_core.user, 'login'):
-            if app_core.user.login not in session:
-                return True
-            else:
-                return False
-        else:
+        if session.get('login') != self.login:
             return True
+        else:
+            return False
 
     def _find_user(self) -> LogInState:
         """Check if the user wth given login exist."""
@@ -130,14 +150,16 @@ class LogInHandler(Manager):
     def _check_password(self) -> bool:
         """Check if password hash stored in database matches the user-provided password.
         :returns: True if it matches, False if it does not"""
-        password_state = check_password_hash(self.database.get_information(f"SELECT PASSWORD FROM users WHERE "
-                                                                           f"login='{self.login}'")[0],
-                                             request.form.get('password'))
-        return password_state
+        return check_password_hash(self.database.get_information(f"SELECT PASSWORD FROM users WHERE "
+                                                                 f"login='{self.login}'")[0],
+                                   request.form.get('password'))
 
 
 class RegistrationHandler(Manager):
     """Class for conducting the registration process."""
+
+    #  WARNING: users can create different accounts with one email.
+    #  This is only to make testing easier and should be fixed before deployment
 
     def __init__(self) -> None:
         super().__init__(2)
@@ -273,5 +295,3 @@ class EmailConfirmationHandler(Manager):
     def _get_by_login(self) -> int:
         """Get user id from login."""
         return self.database.get_information(f"SELECT id FROM users WHERE login='{self.login}'")[0]
-
-

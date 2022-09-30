@@ -1,7 +1,7 @@
 from enum import Enum
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from abc import ABC
 from flask_login import UserMixin
+from os.path import exists
 from Lib.server.managers import UserSubscriptionManager, UserPostManager
 from Lib.server.database import DataBase
 
@@ -68,14 +68,26 @@ class User(UserMixin, ABC):
     def __init__(self, data: list) -> None:
         self.user_id, self.login, self.email_address, self.register_date, self.status, self.role = data
         self.SubscriptionManger = UserSubscriptionManager(self.user_id)
+        self.avatar = self._get_avatar()
+
+    def _get_avatar(self):
+        return f'{self.user_id}.jpeg' if exists(f'static/avatar_images/{self.user_id}.jpeg') else '0.jpeg'
 
     @property
-    def get_int_id(self):
+    def get_user_id(self):
         return self.user_id
+
+    @property
+    def get_login(self):
+        return self.login
 
     @property
     def get_role(self):
         return self.role
+
+    @property
+    def get_avatar(self):
+        return f'static/avatar_images/{self.avatar}'
 
     @property
     def is_authenticated(self):
@@ -87,8 +99,7 @@ class User(UserMixin, ABC):
     def __repr__(self):
         parameters_string = ''
         for attr in self.__dict__.items():
-            parameters_string += f"{attr[0]} = " \
-                                 f"{attr[1]}, \n\t"
+            parameters_string += f"{attr[0]} = {attr[1]}, \n\t"
 
         return f'{self.__class__.__name__}({parameters_string})'
 
@@ -142,4 +153,3 @@ class UserFactory:
         data = [i for i in data]
         data.insert(0, user_id)
         return data
-
