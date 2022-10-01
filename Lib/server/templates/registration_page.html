@@ -22,17 +22,31 @@
             <h2>Create your account</h2>
             <form action="" method="post">
                 <i class="fa-solid fa-user"></i>
-                <input name="login" placeholder="login" type="text" class="info"><br>
+                <input name="login" placeholder="login" type="text" class="info" id="login"><br>
                 <i class="fa-solid fa-lock"></i>
-                <input name="password" placeholder="password" type="password" class="info"><br>
+                <input name="password" placeholder="password" type="password" class="info" id="password"><br>
                 <i class="fa-solid fa-envelope-open"></i>
-                <input name="email" placeholder="email" type="email" class="info"><br>
-                <input type="submit" value="Submit" onclick="tell();" id="create_account_button">
+                <input name="email" placeholder="email" type="email" class="info" id="email"><br>
+                <input type="submit" value="Submit" onclick="checkInputs();" id="create_account_button">
             </form>
-            <p>{{errors}}</p>
+            <p id="validation_errors">{{errors}}</p>
 
             <p>Already have an account? <a href="/log_in_page">Log in</a></p>
             <script>
+                function checkInputs(){
+                    login = document.getElementById('login').value;
+                    email = document.getElementById('email').value;
+                    password = document.getElementById('password').value;
+                    if (login == '' | email == '' | password == ''){
+                        event.preventDefault();
+                        document.getElementById('validation_errors').innerHTML='Please, fill in all the fields.';
+                        return false;
+                    }
+                    else{
+                        tell();
+                        return true;
+                    }
+                }
                 function tell() {
                 alert('We have sent a confirmation email to you. Please, check it.');
                 }

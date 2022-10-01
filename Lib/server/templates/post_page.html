@@ -1,6 +1,9 @@
 {% extends 'base.html' %}
 {% block title %}{{ location }}{% endblock %}
 {% block content %}
+<meta name="viewport" content="width=device-width">
+<main role="main">
+    <article>
     <div id="post_page">
         <div id="post">
             <p>{{errors2}}</p>
@@ -22,6 +25,8 @@
             {%endfor %}
         </div>
     </div>
+    </article>
+</main>
 {% endblock %}
 <script type="text/javascript">
     console.log('Post_pag: post: {{ post }}')

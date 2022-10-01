@@ -12,12 +12,12 @@
         <h2>Logging In</h2>
         <img src="{{ url_for('static', filename='images/enter.png') }}">
         <p id="near_image">Log in your account to acces all the functions</p>
-        <form action="" method="post">
-            <input name="login" placeholder="login" type="text"  class="info">
-            <input name="password" placeholder="password" type="password" class="info">
+        <form action="" method="post" onsubmit="checkInputs();">
+            <input name="login" placeholder="login" type="text"  class="info" id="login">
+            <input name="password" placeholder="password" type="password" class="info" id="password">
             <input type="submit" value="Log in" id="log_in">
         </form>
-        <p>{{errors}}</p>
+        <p id="validation_errors">{{errors}}</p>
     </div>
     <div class="modal modal__show" id='modal_window' style="display: none;">
         <div class="modal__backdrop" data-dismiss="modal">
@@ -51,6 +51,18 @@
     }
     function cancel() {
         modal_window.style.display="none";
+    }
+    function checkInputs(){
+        login = document.getElementById('login').value;
+        password = document.getElementById('password').value;
+        if (login == '' | password == ''){
+            event.preventDefault();
+            document.getElementById('validation_errors').innerHTML='Please, fill in all the fields.';
+            return false;
+        }
+        else{
+            return true;
+        }
     }
 </script>
 </body>

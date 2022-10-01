@@ -30,7 +30,6 @@ def admin_required(func: Callable):
     def wrapper(*args):
         role = DataBase().get_information(f'SELECT role FROM users WHERE '
                                           f'id="{users.get(session.get("login")).get_user_id}"')
-        print(admin.url)
         if role and role[0] == 3:
             return func(args[0])
         else:
@@ -82,7 +81,7 @@ class Comments(db.Model):
     date = db.Column(db.String)
 
 
-admin = Admin(app, name='WebSocial', template_mode='bootstrap3', index_view=AdminView())
+admin = Admin(app, name='WebSocial', index_view=AdminView())
 admin.add_view(MyModelView(Users, db.session))
 admin.add_view(MyModelView(Posts, db.session))
 admin.add_view(MyModelView(Comments, db.session))

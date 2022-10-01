@@ -2,28 +2,29 @@ from typing import Union, Any
 from threading import Thread
 from json import dumps, JSONEncoder
 
-from flask import render_template, request, url_for, redirect, Response, abort, jsonify
+from flask import render_template, request, url_for, redirect, Response, abort
 from flask_login import login_required, logout_user
 from flask import session
 
 from Lib.server.app_core import app, login_manager, users
 from Lib.server.processes import RegistrationHandler, LogInHandler, PrivatePage, get_user
 from Lib.server.utils import UsersObserver
-from Lib.server.posts import FullyFeaturedPost
+from Lib.server.posts import FullyFeaturedPost, AdminPostRegistry, PostRegistry
 
-# Things that need fixing
-#   User can have two personal page at once by just copy-pasting the link of his page
+# Things that need fixing:
+#   1)User can have two personal page at once by just copy-pasting the link of his page
 #   or logging in as a different person. He might break system for himself in some
 #   cases
 #
 #
 # Load personal page
+#   Add at least a little bit of new styles to display the posts flow in the right order
 #
 # Add different pages and features for users and admins
 #
 # Post features:
-#   Add curse-comment ban system
-#   Add preferences system based on posts tags
+#   1)Add curse-comment ban system
+#   2)Add preferences system based on posts tags
 #
 # Add getters and setters instead of changing arguments directly
 
@@ -31,21 +32,28 @@ temp = {}  # a very bad solution, should solve this resend email problem somehow
 Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
 
 
-@app.route('/testing_page')
-def rc():
-    return render_template('testing.html')
-
-
 class Encoder(JSONEncoder):
     def default(self, o: Any) -> Any:
         return o.__dict__
 
 
-@app.route('/onloading_test')
-def req(count: int):
-    post_amount = count*2
-    data = {post_amount+1: FullyFeaturedPost(1),
-            post_amount+1: FullyFeaturedPost(2)}
+@app.route('/extend_posts', methods=['GET', 'POST'])
+def extend_posts():
+    data = {}
+    post_amount = 4
+    count = request.json
+    for i in enumerate(PostRegistry.get_posts(post_amount, int(count)*post_amount)):
+        data[i[0]] = i[1]
+    return dumps(data, cls=Encoder)
+
+
+@app.route('/admin_get_posts', methods=['GET', 'POST'])
+def admin_get_posts():
+    data = {}
+    post_amount = 2
+    count = request.json
+    for i in enumerate(AdminPostRegistry.get_posts(post_amount, int(count)*2)):
+        data[i[0]] = i[1]
     return dumps(data, cls=Encoder)
 
 
@@ -75,6 +83,9 @@ def check_status(status, **kwargs) -> Union[Response, str]:
 
 @app.route('/')
 def clear_session():
+    #  This is just to clear the session easier, as I can't log in
+    #  if I restarted the server but never closed my browser window.
+    #  This view is going to be removed when development is over.
     session.clear()
     abort(404)
 
@@ -100,16 +111,17 @@ def registration_page() -> Union[Response, str]:
 def log_in():
     log_in_handler = LogInHandler()
     log_in_handler.log_user()
-    responses = {1: render_template('log_in_page.html', errors='Wrong credentials'),
+    responses = {1: render_template('log_in_page.html', errors='Wrong credentials.'),
                  2: render_template('log_in_page.html', already_logged_in=True, logged_as=session.get('login'),
                                     name=log_in_handler.login),
-                 3: redirect(url_for('personal_page')),
-                 4: redirect('/admin/')}
+                 3: render_template('log_in_page.html', errors='You did not confirm your email.'),
+                 4: redirect(url_for('personal_page')),
+                 5: redirect('/admin/')}
     return responses.get(log_in_handler.status.value)
 
 
 @app.route('/log_in_anyways/<login>')
-@login_required
+@login_required(session)
 def log_in_anyways(login: str) -> Response:
     log_in_handler = LogInHandler()
     log_in_handler.force_log_in(login)

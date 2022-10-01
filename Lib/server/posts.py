@@ -48,7 +48,6 @@ class PostForDisplay(Post):
     def __init__(self, post_id: int) -> None:
         super(PostForDisplay, self).__init__(post_id)
         self.author = self._find_author()
-        self.comment_registry = CommentsRegistry(self.post_id)
 
     def _find_author(self) -> str:
         """Get the author of the post.
@@ -118,7 +117,7 @@ class CommentsRegistry:
         """Get all the the comments from database."""
         comment_ids = self.database.get_many_singles(f'SELECT comment_id FROM comments '
                                                      f'WHERE post_id="{self.post_id}"', size=amount)
-        comments = {i: Comment(i) for i in comment_ids}
+        comments = {comment_id: Comment(comment_id) for comment_id in comment_ids}
         return comments
 
     def __iter__(self):
@@ -130,7 +129,7 @@ class CommentsRegistry:
             raise StopIteration
         else:
             self.counter += 1
-            return list(self.comments.values())[self.counter-1]
+            return list(self.comments.values())[self.counter - 1]
 
     def __repr__(self) -> str:
         return f'{self.__class__.__name__}(post_id={self.post_id}, comments={self.comments})'
@@ -139,6 +138,7 @@ class CommentsRegistry:
 class FullyFeaturedPost(PostForDisplay):
     """PostForDisplay with a CommentRegistry
     to access all comments on this post through it."""
+
     def __init__(self, post_id: int) -> None:
         super().__init__(post_id)
         self.comment_registry = CommentsRegistry(self.post_id)
@@ -148,5 +148,32 @@ class FullyFeaturedPost(PostForDisplay):
         return self.comment_registry
 
 
+class PostRegistry:
+    database = DataBase()
+
+    @classmethod
+    def get_posts(cls, amount: int, start_with: int):
+        counter = 0
+        data = cls.database.get_all_singles(f'SELECT post_id FROM posts ORDER BY '
+                                            f'post_id DESC LIMIT {amount} OFFSET {start_with}')
+        posts = [PostForDisplay(post_id) for post_id in data]
+        while counter < len(posts):
+            yield posts[counter]
+            counter += 1
+
+
 class AdminPostRegistry:
-    def __init__(self):
+    database = DataBase()
+    #  need to add a system to verify posts
+    #  posts that are verified should not get displayed on the admins page
+
+    @classmethod
+    def get_posts(cls, amount: int, start_with: int):
+        counter = 0
+        data = cls.database.get_all_singles(f'SELECT post_id FROM posts ORDER BY '
+                                            f'post_id DESC LIMIT {amount} OFFSET {start_with}')
+        posts = [FullyFeaturedPost(post_id) for post_id in data]
+        while counter < len(posts):
+            yield posts[counter]
+            counter += 1
+

@@ -33,8 +33,9 @@ class LogInState(Enum):
     """Represents possible conditions of the process of logging in"""
     WrongCredentials = 1
     UserAlreadyLoggedIn = 2
-    CredentialsFine = 3
-    AdminUser = 4
+    EmailNotConfirmed = 3
+    CredentialsFine = 4
+    AdminUser = 5
 
 
 class PrivatePage:
@@ -42,9 +43,6 @@ class PrivatePage:
         if get_user().get_role.value == 1:
             self.latest_posts = PostRegistry.get_others_latest_posts()
         elif get_user().get_role.value == 2:
-            self.latest_posts, self.my_latest_posts = PostRegistry.get_data()
-        elif get_user().get_role.value == 3:
-            # specific features for admin should be added
             self.latest_posts, self.my_latest_posts = PostRegistry.get_data()
 
     @property
@@ -97,7 +95,7 @@ class LogInHandler(Manager):
         """General function that launches all the processes of logging in"""
         self.login = request.form.get('login')
         self._check_properties()
-        if self.status.value >= 3:
+        if self.status.value >= 4:
             self._log_in(self.login)
         return self.status
 
@@ -127,7 +125,9 @@ class LogInHandler(Manager):
         """Check if all the user-given data is alright."""
         if self._find_user() == LogInState.WrongCredentials or self._check_password() is False:
             self.status = LogInState.WrongCredentials
-        elif self._check_if_user_logged_in() is False:
+        elif self.database.get_information(f'SELECT status FROM users WHERE login="{self.login}"')[0] != 1:
+            self.status = LogInState.EmailNotConfirmed
+        elif not session.get('login') != self.login:
             self.status = LogInState.UserAlreadyLoggedIn
         else:
             self.status = LogInState.CredentialsFine
