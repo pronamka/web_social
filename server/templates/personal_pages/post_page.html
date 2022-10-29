@@ -1,0 +1,30 @@
+{% extends 'personal_pages/base.html' %}
+{% block title %}{{ location }}{% endblock %}
+{% block content %}
+<meta name="viewport" content="width=device-width">
+<main role="main">
+    <article>
+    <div id="post_page">
+        <div id="post">
+            <p>{{errors2}}</p>
+            <iframe src="{{ url_for('static', filename= post.get_path) }}" width="800px" height="1100px"></iframe>
+        </div>
+        <div class="comment_section">
+            <div id="leave_comment">
+                 <form action="/private/{{login}}/leave_comment" method="post">
+                     <textarea placeholder="Your comment" name="comment"></textarea>
+                     <input type="submit" value="Send" name="add_comment">
+                 </form>
+                <p style="font-family: 'Evanston Tavern 1826'; color: red; font-size: large;">{{errors}}</p>
+            </div>
+            <p>All comments:</p>
+            {% for i in post.get_comments %}
+            <div class="horizontal_line2"></div>
+                <p class="additional_info">{{i.get_author}}</p>
+                <p class="main_comment">{{i.get_text}}</p>
+            {%endfor %}
+        </div>
+    </div>
+    </article>
+</main>
+{% endblock %}

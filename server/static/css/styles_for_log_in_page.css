@@ -1,0 +1,230 @@
+@font-face {
+  font-family: "centurygothic";
+  font-style: normal;
+  font-weight: 400;
+  src: local("centurygothic"),
+       url("/fonts/centurygothic.ttf") format("ttf"),
+       url("/fonts/centurygothic.ttf") format("ttf");
+}
+body{
+	background-image: url(backgrounds/geometric_background.jpg);
+	width: auto;
+	height: auto;
+}
+@media (max-width: 20000px){
+	.container{
+		width: 60%;
+		margin-top: 50px;
+		margin-left: -4px;
+		display: inline-block;
+	}
+	.container img{
+		margin-left: 30px;
+	}
+	.container p{
+		margin-left: 50px;
+	}
+	#near_image{
+		margin-left: auto;
+		margin-right: auto;
+	}
+@media (max-width: 1200px){
+	.container{
+		width: 80%;
+		margin-left: auto;
+		margin-right: auto;
+		display: block;
+		margin-top: -20px;
+	}
+	#near_image{
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+@media (max-width: 767px){
+	.container{
+		width: 90%;
+		margin-top: -20px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+@media (max-width: 600px){
+	.container{
+		width: 90%;
+		margin-top: -20px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+}
+@media (max-width: 540px){
+	.container{
+		width: 90%;
+		margin-top: -20px;
+		margin-left: auto;
+		margin-right: auto;
+	}
+	.container img{
+		display: none;
+	}
+	.container p{
+		text-align: center;
+	}
+}
+.container{
+	margin-top: 5%;
+	max-width: 600px;
+	display: block;
+	background-color: white;
+	align-items: center;
+	margin-left: auto;
+	margin-right: auto;
+	font-family: 'centurygothic';
+	height: 600px;
+}
+.container h2{
+	text-shadow: 2px;
+	text-align: center;
+}
+.container h1{
+	text-shadow: 2px;
+	text-align: center;
+}
+.container img{
+	margin-bottom: 10px;
+	width: 75px;
+	height: 75px;
+	float: left;
+}
+.info{
+	margin: 2px;
+	height: 40px;
+	width: 80%;
+	margin-left: 10%;
+}
+#log_in{
+	display: block;
+	margin-top: 5px;
+	margin-left: auto;
+	margin-right: auto;
+	width: 82%;
+	height: 30px;
+	font-size: large;
+	color: whitesmoke;
+	background-color: #4682B4;
+}
+#log_in:hover{
+	margin-top: 5px;
+	margin-left: 53px;
+	width: 82%;
+	height: 30px;
+	font-size: large;
+	color: whitesmoke;
+	background-color: #0000CD;
+	cursor: pointer;
+}
+#near_image{
+	display: block;
+	max-width: 250px;
+	font-size: large;
+}
+.modal__backdrop {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity0 .2s ease-in;
+}
+
+.modal__content {
+  position: relative;
+  width: auto;
+  margin: 10px;
+  transition: opacity 0.3s ease-in;
+  display: flex;
+  flex-direction: column;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0.3rem;
+  box-shadow: 0 0 7px 0 rgba(0, 0, 0, 0.3);
+}
+
+@media (min-width: 576px) {
+  .modal__content {
+    max-width: 500px;
+    margin: 50px auto;
+  }
+}
+
+.modal__show .modal__backdrop,
+.modal__show .modal__content {
+  opacity: 1;
+  z-index: 1050;
+  pointer-events: auto;
+  overflow-y: auto;
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px;
+  border-bottom: 1px solid #eceeef;
+  font-family: "centutygothic";
+  font-size: 16;
+  text-decoration: underline;
+}
+
+.modal__title {
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 1.5;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.modal__btn-close {
+  float: right;
+  font-family: sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  color: #000;
+  text-shadow: 0 1px 0 #fff;
+  opacity: 0.5;
+  text-decoration: none;
+}
+
+.modal__btn-close:focus,
+.modal__btn-close:hover {
+  color: #000;
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.75;
+}
+
+.modal__body {
+  position: relative;
+  flex: 1 1 auto;
+  padding: 15px;
+  overflow: auto;
+}
+
+.modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 1rem;
+  border-top: 1px solid #e9ecef;
+  border-bottom-right-radius: 0.3rem;
+  border-bottom-left-radius: 0.3rem;
+}
+.button_cancel {
+  display: inline-block;
+}

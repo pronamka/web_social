@@ -1,0 +1,41 @@
+body{
+    background-color: whitesmoke;
+    background-image: none;
+}
+[data-tab-info]{
+    display: none;
+    margin-left: 5%;
+}
+.active[data-tab-info]{
+    display: block;
+}
+#last_post, #short_analitics{
+    display: inline-flex;
+    width: 400px;
+    height: 500px;
+    border: 0.5px solid gray;
+    outline: 1px dashed gray;
+    outline-offset: -10px;
+    margin-right: 20px;
+    background-color: white;
+}
+#short_analitics{
+    width: 300px;
+    height: 400px;
+    vertical-align: top;
+    outline: none;
+}
+#upload_file{
+    width: 70%;
+    height: 90%;
+}
+#upload_file ::backdrop{
+    background: rgba(0, 0, 0, 0.5);
+}
+#btn-open-upload-dialog{
+    vertical-align: bottom;
+    width: 100px;
+    height: 50px;
+    background-color: lightblue;
+    color: white;
+}

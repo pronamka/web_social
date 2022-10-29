@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename= 'css/personal_pages/stylesForPrivatePage.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename= 'css/personal_pages/styles_for_Prototype.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename= 'css/personal_pages/styles_for_Personalization_page.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
+    <meta name="viewport" content="width=device-width">
+</head>
+<body>
+<input type="checkbox" id="nav-toggle">
+<nav class="nav">
+    <label for="nav-toggle" class="nav-toggle" onclick></label>
+    <h2 class="logo">{{session.get('login')}}</h2>
+    <img src="{{ url_for('static', filename= '/avatar_images/' + session.get('id') + '.jpeg') }}" class="avatar">
+    <p id="status">Status: online</p>
+    <form action="/log_out" method="get" id="log_out_block">
+        <button type="submit" name="log_out" width="100px">Log out</button>
+    </form>
+    <!---<i class="fa-solid fa-arrow-right-from-bracket"></i>--->
+    <ul>
+        <li>
+            <button onclick="window.location.href=`{{ url_for('personal_page')}}`">
+                Hub
+            </button>
+        </li>
+        <li>
+            <button onclick="window.location.href=`{{ url_for('subscribed_to_videos')}}`">
+                Subscriptions
+            </button>
+        </li>
+        <li>
+            <button onclick="window.location.href=`{{ url_for('personal_page')}}`">
+                Personalization
+            </button>
+        </li>
+        <li>
+            <button onclick="window.location.href=`{{ url_for('dev_studio')}}`">
+                Your Posts
+            </button>
+        </li>
+        <li>
+            <button onclick="window.location.href=`{{ url_for('personal_page')}}`">
+                Ask administrator
+            </button>
+        </li>
+    </ul>
+</nav>
+{% block content %}{% endblock %}
+</body>
+</html>

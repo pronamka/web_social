@@ -1,0 +1,17 @@
+.post_data{
+    display: inline-block;
+    vertical-align: top;
+    margin: 10px;
+    margin-bottom: 20px;
+}
+.comment_info{
+    padding-left: 10px;
+}
+ul {
+    list-style-position: inside;
+    font-family: 'centurygothic';
+}
+details{
+    display: inline-block;
+    font-size: 18px;
+}

@@ -1,0 +1,34 @@
+#find_post_button{
+	display: inline-block;
+	height: 35px;
+	cursor: pointer;
+}
+#find_post_textarea{
+	width: 360px;
+	height: 30px;
+	word-break: break-all;
+	display: inline-block;
+	resize: none;
+	font-family: 'FontAwesome';
+}
+#delete_post{
+	width: 300px;
+}
+#Icons{
+	position: relative;
+	top: 6px;
+}
+#Capa_1{
+	position: relative;
+	top: 6px;
+}
+.manage_posts{
+    position: relative;
+    left: 50px;
+}
+.manage_posts h2{
+	font-family: 'centurygothic';
+}
+.enter_text{
+	font-family: 'Evanston Tavern 1826';
+}

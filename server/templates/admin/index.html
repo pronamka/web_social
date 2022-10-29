@@ -1,0 +1,9 @@
+{% extends 'admin/master.html' %}
+{% block body %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles_for_admin_page.css') }}">
+    <script src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+    <h1>Latest unexamined posts</h1>
+    <div id="posts_table"></div>
+    <script src="{{ url_for('static', filename='js/js_for_admin.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'personal_pages/base.html' %}
+{% block title %}{{session.get('login')}}'s page{% endblock %}
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
+<meta name="viewport" content="width=device-width">
+<main role="main">
+    <article>
+        <div class="wrapper">
+            <div class="notes">
+                <form method="POST" action="/search_for/" id="searching_form">
+                    <input type="text" name="search_request" id="inp-search-main-page" placeholder="Search for">
+                    <button type="submit" name="search_submit" id="btn-search-main-page"><i class="fa-solid fa-magnifying-glass"></i></button>
+                </form>
+                <p>{{errors2}}</p>
+                    <h2>Latest post of every <br>
+                        person you are subscribed to:</h2>
+                <div id="post_flow">
+                </div>
+            </div>
+        </div>
+    </article>
+</main>
+<script src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+<script src="{{ url_for('static', filename='js/scripts_for_main_page.js')}}"></script>
+{% endblock %}

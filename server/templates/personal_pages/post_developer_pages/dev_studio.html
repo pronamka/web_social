@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
+    filename= 'css/personal_pages/stylesForPrivatePage.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
+    filename= 'css/personal_pages/styles_for_Prototype.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
+    filename= 'css/personal_pages/dev_studio/styles_for_studio_main.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
+    filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
+    <meta name="viewport" content="width=device-width">
+</head>
+<body>
+    <input type="checkbox" id="nav-toggle">
+    <nav class="nav">
+        <label for="nav-toggle" class="nav-toggle" onclick></label>
+        <h2 class="logo">{{session.get('login')}}</h2>
+        <img src="{{ url_for('static', filename= '/avatar_images/' + session.get('id') + '.jpeg') }}" class="avatar">
+        <p id="status">Status: online</p>
+        <form action="/log_out" method="get" id="log_out_block">
+            <button type="submit" name="log_out" width="100px">Log out</button>
+        </form>
+        <!---<i class="fa-solid fa-arrow-right-from-bracket"></i>--->
+        <ul class="tabs">
+            <li>
+                <button data-tab-value="#hub">Hub</button>
+            </li>
+            <li>
+                <button data-tab-value="#content">Content</button>
+            </li>
+            <li>
+                <button data-tab-value="#analitics">Analitics</button>
+            </li>
+            <li>
+                <button data-tab-value="#commentaries">Commentaries</button>
+            </li>
+            <li>
+                <button data-tab-value="#translations">Translations</button>
+        </li>
+        <li>
+            <button data-tab-value="#copyright">Copyright Policy</button>
+        </li>
+        <li>
+            <button data-tab-value="#monetization">Monetization</button>
+        </li>
+    </ul>
+</nav>
+<main role="main">
+    <article>
+        <div class="tab-content">
+            <div class="tabs__tab active" id="hub" data-tab-info>
+                <h2>Content-creatror account managment pannel.</h2>
+                <div id="last_post">
+                </div>
+                <div id="short_analitics"></div>
+                <dialog id="dialog-upload-file">
+                    <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+                        <input type="file" name="file" placeholder="Select a file" id="inp-file">
+                        <input type="submit" name="send_file" placeholder="Post!">
+                    </form>
+                </dialog>
+            </div>
+            <div class="tabs__tab" id="content" data-tab-info>
+                <h2>Your posts</h2>
+                <div id="my_posts"></div>
+            </div>
+            <div class="tabs__tab" id="analitics" data-tab-info>
+                <h2>Publication analitics</h2>
+                <div id="subscribers_graph"></div>
+                <div id="comments_info"></div>
+            </div>
+            <div class="tabs__tab" id="commentaries" data-tab-info>
+                <h2>Comments on your publications</h2>
+                <div id="comments_flow"></div>
+            </div>
+            <div class="tabs__tab" id="translations" data-tab-info>
+                <h2>Translations managment pannel</h2>
+                <div id="translations">In development...</div>
+            </div>
+            <div class="tabs__tab" id="copyright" data-tab-info></div>
+            <div class="tabs__tab" id="monetization" data-tab-info></div>
+        </div>
+    </article>
+</main>
+<script src="{{ url_for('static', filename='js/jquery.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dev_studio/scripts_for_studio_main.js')}}"></script>
+</body>
+</html>
