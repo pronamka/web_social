@@ -1,57 +1,50 @@
-const request_url = '/extend_sub_posts';
+const request_url = '/load_info/';
 
-var extension_counter = -1;
+var settings = {'page': 'subscription_page', 'dates_loaded': 0}
 
 document.addEventListener('DOMContentLoaded', getPosts());
 
-/**
-function sendRequest(url, method){
-    const request_headers = {'Content-Type': 'application/json'}
-    console.log(method)
-    extension_counter = extension_counter + 1;
-    return fetch(url, {
-        mehtod: 'POST',
-        body: JSON.stringify(extension_counter),
-        headers: request_headers
-    }).then(response => {
-        return response.text();
-    })
-} */
-function sendRequest(method, url) {
+function sendRequest(method, url, body) {
     const headers = {'Content-Type': 'application/json'}
-    extension_counter = extension_counter+1;
     return fetch(url, {
         method: method,
-        body: JSON.stringify(extension_counter),
+        body: JSON.stringify(body),
         headers: headers}).then(response => {
         return response.text()
     })
 }
 
 function getPosts(){
-    sendRequest('POST', request_url).then(resp => {
+    sendRequest('POST', request_url, settings).then(resp => {
         posts_dict = JSON.parse(resp);
-        buildPosts(posts_dict);
+        settings['dates_loaded'] += posts_dict['dated_posts'][2] +1
+        buildPosts(posts_dict['dated_posts']);
     })
 }
 function buildPosts(post_dict){
-    date = post_dict['date']
-    delete post_dict['date']
-    addHTML('<h3>'+date+'</h3>')
-    for (var i=0, l=Object.keys(post_dict).length; i<=l; i++){
-        try{
-            title = post_dict[i]['title'];
-            author = post_dict[i]['author'];
-            post_id = post_dict[i]['post_id'];
-            path = '/static/upload_folder/'+title;
-            post = buildHTML(path, author, title, post_id);
-            addHTML(post);
+    posts = post_dict[0]
+    date = post_dict[1]
+    if (posts.length > 0){
+        addHTML('<h3>'+date+'</h3>')
+        for (var i=0, l=Object.keys(posts).length; i<=l; i++){
+            try{
+                
+                title = posts[i]['title'];
+                author = posts[i]['author'];
+                post_id = posts[i]['post_id'];
+                path = '/static/upload_folder/'+title;
+                post = buildHTML(path, author, title, post_id);
+                addHTML(post);
+            }
+            catch(error){
+                console.log(error);
+            }
         }
-        catch(error){
-            console.log(error);
+        addHTML('<div class="ln-dates-sep"></div>')
+        if (posts.length < 5) {
+            getPosts();
         }
     }
-    addHTML('<div class="ln-dates-sep"></div>')
 }
 function buildHTML(path, author, title, post_id){
     html = `<object class="table_cell">
@@ -75,12 +68,11 @@ function addHTML(html) {
     return template.content.firstChild;
 }
 
-$(document).ready(function(){
-    $(window).bind('scroll', extensionNeedChecker)
-    function extensionNeedChecker(){
-        if ($(window).scrollTop() >= $(document).height()-$(window).height() - 300){
-            $(window).unbind('scroll', extensionNeedChecker);
-            getPosts();
-        }
-    }
-})
+current_position = 250
+window.addEventListener("scroll", function(event) {
+    var top = this.scrollY
+    if (current_position < top){
+        current_position += 1000
+        getPosts();
+    } 
+}, false);
