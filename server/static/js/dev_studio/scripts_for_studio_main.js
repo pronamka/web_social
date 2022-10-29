@@ -6,7 +6,7 @@ const action_protocols = {'hub': {'/inf_for_hub': null},
                         'commentaries': {'/commentaries': 0}, 
                         'translations': {'/trananslations': 0},
                         };
-const content_page = {'page': 'content', 'posts_got': 0, 'posts_need': 2, 'post_type': 'FullyFeaturedPost'}
+const content_page = {'page': 'content', 'posts_loaded': 0, 'posts_required': 2, 'post_type': 'FullyFeaturedPost'}
 const btn_upload_files = document.querySelector('btn-upload-files');
 
 document.addEventListener('DOMContentLoaded', loadHub());
@@ -61,7 +61,7 @@ function loadContentPage(){
     sendRequest('POST', '/load_info/', content_page).then(resp => {
         content = JSON.parse(resp)
         console.log(content)
-        content_page['posts_got'] += 2
+        content_page['posts_loaded'] += 2
         buildPosts(content['latest_posts'])
     })
 }
@@ -93,7 +93,6 @@ class Post{
         this.post_title = post_dict['title'];
     }
     get allValues(){
-        console.log(this.author)
         return (this.author, this.comment_registry, this.creation_date,
             this.post_id, this.post_title);
     }
@@ -191,7 +190,6 @@ nav_tabs.forEach(tab => {
             tabInfo.classList.remove('active');
         })
         const a = direction['id']
-        console.log(action_protocols[a]['called'])
         if (action_protocols[a]['called'] == 0){
             action_protocols[a]['call']()
         }

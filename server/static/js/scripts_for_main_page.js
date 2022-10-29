@@ -1,53 +1,30 @@
-/**function get_len() {
-    $.ajax({
-        type: "POST",
-        url: "/private/<login>/leave_comment",
-        data: $('form').serialize(),
-        success: function(response) {
-            var json = jQuery.parseJSON(response)
-            $('#len1').html(json.len)
-            console.log(response);
-        },
-        error: function(error) {
-            console.log(error);
-        }
-    });
-}
-*/
-const request_url = '/extend_posts';
+const request_url = '/load_info/';
 
 var extension_counter = -1;
 
+var settings = {'page': 'main_user_page', 'posts_loaded': 0, 'posts_required': 8,
+'of_user': 0}
+
 document.addEventListener('DOMContentLoaded', getPosts());
 
-/**
-function sendRequest(url, method){
-    const request_headers = {'Content-Type': 'application/json'}
-    console.log(method)
-    extension_counter = extension_counter + 1;
-    return fetch(url, {
-        mehtod: 'POST',
-        body: JSON.stringify(extension_counter),
-        headers: request_headers
-    }).then(response => {
-        return response.text();
-    })
-} */
-function sendRequest(method, url) {
+function sendRequest(method, url, body) {
     const headers = {'Content-Type': 'application/json'}
-    extension_counter = extension_counter+1;
+    console.log(body)
     return fetch(url, {
         method: method,
-        body: JSON.stringify(extension_counter),
+        body: JSON.stringify(body),
         headers: headers}).then(response => {
         return response.text()
     })
 }
 
 function getPosts(){
-    sendRequest('POST', request_url).then(resp => {
+    sendRequest('POST', request_url, settings).then(resp => {
         posts_dict = JSON.parse(resp);
-        buildPosts(posts_dict);
+        settings['posts_loaded'] += settings['posts_required']
+        settings['posts_required'] = 4
+        console.log(posts_dict)
+        buildPosts(posts_dict['latest_posts']);
     })
 }
 function buildPosts(post_dict){
@@ -67,7 +44,7 @@ function buildPosts(post_dict){
 }
 function buildHTML(path, author, title, post_id){
     html = `<object class="table_cell">
-            <iframe width="250" height="400" class="preview" src="`+ path+`"></iframe>
+            <iframe width="300" height="500" class="preview" src="`+ path+`"></iframe>
             <div class="for_preview">
                 <p class="post_name">
                 <a href="/view_post/?post_id=`+post_id+`">`+ title+`</a>
@@ -87,12 +64,11 @@ function addPost(html) {
     return template.content.firstChild;
 }
 
-$(document).ready(function(){
-    $(window).bind('scroll', extensionNeedChecker)
-    function extensionNeedChecker(){
-        if ($(window).scrollTop() >= $(document).height()-$(window).height() - 300){
-            $(window).unbind('scroll', extensionNeedChecker);
-            getPosts();
-        }
-    }
-})
+current_position = 250
+window.addEventListener("scroll", function(event) {
+    var top = this.scrollY
+    if (current_position < top){
+        current_position += 1000
+        getPosts();
+    } 
+}, false);
