@@ -82,6 +82,10 @@ class User(UserMixin, ABC):
         return self.login
 
     @property
+    def get_email(self):
+        return self.email_address
+
+    @property
     def get_role(self):
         return self.role
 
