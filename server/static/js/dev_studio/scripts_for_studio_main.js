@@ -25,7 +25,6 @@ function sendRequest(method, url, body) {
 function loadHub(){
     sendRequest('POST', '/load_info/', {'page': 'hub'}).then(resp => {
         content = JSON.parse(resp)
-        console.log(content)
         if (content['latest_posts'] != 0){
             title=content['latest_posts']['0']['title'];
             path = '/static/upload_folder/'+title
@@ -44,7 +43,6 @@ function loadHub(){
                     </div>`;
         }
         insertHTML('#last_post', html);
-        console.log(content);
         subscribers = content['subscribers'];
         post_amount = content['post_amount'];
         comment_amount = content['commentaries_received'];
@@ -60,7 +58,6 @@ function loadHub(){
 function loadContentPage(){
     sendRequest('POST', '/load_info/', content_page).then(resp => {
         content = JSON.parse(resp)
-        console.log(content)
         content_page['posts_loaded'] += 2
         buildPosts(content['latest_posts'])
     })
