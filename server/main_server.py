@@ -1,28 +1,30 @@
-from typing import Union
+from typing import Union, Callable
 from threading import Thread
+from functools import wraps
 
 from flask import render_template, request, url_for, redirect, Response, abort
 from flask_login import login_required, logout_user
 from flask import session
 
 from server.app_core import app, login_manager, users
-from server.processes import RegistrationHandler, LogInHandler, get_user
+from server.processes import RegistrationHandler, LogInHandler, EmailBanMessageSender, \
+    get_user, verify_post, write_comment
 from server.utils import UsersObserver, FileManager
 from server.posts import FullyFeaturedPost
-from server.user import UserFactory
+from server.user import UserFactory, UserRole
 
 # Things that need fixing:
 #   1)User can have two personal page at once by just copy-pasting the link of his page
 #   or logging in as a different person. He might break system for himself in some
 #   cases.
 #
-#   2) On subscription page posts are not displayed properly
-#      (if no one of made a post in 24 hours then it will just stop loading posts),
-#      it should be made so posts are loaded until the users screen is filled,
-#      and he has to scroll to see more
+#   2)Loading post with specific date on subscription page requires accessing
+#   database numerous times to find anything. It should only require accessing
+#   it one time, and looking for the first entry instead.
 #
-# Load new pages:
-#   Add at least a little bit of new styles to display the posts flow in the right order.
+# Add a way for users to restore passwords if forgotten.
+#
+# Add events system for handling registration, log in and other processes.
 #
 # Add different pages and features for users and admins.
 #
@@ -30,21 +32,24 @@ from server.user import UserFactory
 #
 # Add a way to comment and subscribe.
 #
-# Add likes, views,
+# Add likes, views.
 #
 # Add session expiry system.
 #
+# Add a way to copyright posts.
+#
+# Add a way to redact posts for admins.
+#
 # Load developer studio page:
 #   Write a function to give the client information to display hub
-#   Add content to different fields such as content, translations, monetization, commentaries etc.
-#   Finally add a way to post and comment
+#   Add a way to comment
+#   Add content to fields such as commentaries, analytics, translations, monetization etc.
 #
 #
 # Post features:
 #   1)Add curse-comment ban system.
 #   2)Add preferences system based on posts tags.
 #
-# Add getters and setters instead of changing arguments directly.
 
 temp = {}  # a very bad solution, should solve this resend email problem somehow else
 Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
@@ -119,6 +124,44 @@ def log_in_page() -> Union[Response, str]:
         return log_in()
 
 
+def admin_required(func: Callable):
+    @wraps(func)
+    def wrapper():
+        if get_user().get_role == UserRole.Admin:
+            try:
+                return func()
+            except AssertionError as e:
+                return {'status': f'{e.__class__.__name__}: {e}'}
+        else:
+            return abort(418)
+    return wrapper
+
+
+@app.route('/admin/examine_post/', methods=['GET', 'POST'],
+           endpoint='examine_post')
+@admin_required
+def examine_post():
+    post_id = int(request.args.to_dict().get('post_id'))
+    post = FullyFeaturedPost(post_id)
+    return render_template('admin/examine_post.html', post=post)
+
+
+@app.route('/admin/ban_post/', methods=['GET', 'POST'], endpoint='admin_ban_post')
+@admin_required
+def admin_ban_post():
+    post_id, problem_description = request.json.values()
+    assert problem_description, 'You did not provide problem description.'
+    EmailBanMessageSender(post_id, problem_description).send_ban_notification()
+    return {'status': 'successful'}
+
+
+@app.route('/admin/verify_post/', methods=['GET', 'POST'], endpoint='admin_verify_post')
+def admin_verify_post():
+    post_id: int = request.json
+    verify_post(post_id)
+    return {'status': 'successful'}
+
+
 @app.route('/personal_page', methods=['GET', 'POST'])
 @login_required(session)
 def personal_page():
@@ -139,14 +182,24 @@ def personal_page():
 
 
 @app.route('/subscriptions/')
+@login_required(session)
 def subscribed_to_videos():
     return render_template('personal_pages/subscriptions_page.html')
 
 
 @app.route('/view_post/')
+@login_required(session)
 def view_post():
     post = FullyFeaturedPost(int(request.args.to_dict().get('post_id')))
     return render_template('personal_pages/post_page.html', post=post)
+
+
+@app.route('/comment/', methods=['GET', 'POST'])
+@login_required(session)
+def add_comment():
+    post_id, comment_text = request.json.values()
+    write_comment(post_id, comment_text)
+    return 'a'
 
 
 @app.route('/development_studio/')
@@ -161,12 +214,16 @@ def dev_studio():
 @app.route('/upload_file/', methods=['GET', 'POST'])
 def upload_file():
     file = request.files['file']
-    user = get_user()
-    FileManager(file, user.get_user_id).save()
-    new_user = UserFactory.create_and_update(user.get_user_id)
-    users[get_user().get_login] = new_user  # get_user in dictionary key can't be replaced with created user
-    # variable because get_user would return a different object, as new user was created.
+    FileManager(file, get_user().get_user_id).save()
+    check_role()
     return redirect(url_for('dev_studio'))
+
+
+def check_role() -> None:
+    user = get_user()
+    if user.get_role == UserRole.Viewer:
+        new_user = UserFactory.create_and_update(user.get_user_id)
+        users[user.get_login] = new_user
 
 
 @app.route('/log_out')
@@ -182,7 +239,6 @@ def load_user(user_id: str):
     """This function is the part of the logging in process.
     It is needed to define if user should be authorized."""
     current_user = users.get(session.get('login'))
-    print(1+1)
     if int(user_id) == current_user:
         return get_user()
     else:
