@@ -78,9 +78,10 @@ operations_rev = {AccessLevel(1): ['CREATE', 'UPDATE', 'DELETE', 'DROP', 'PRAGMA
 
 commands_dict = {'SELECT': AccessLevel(1),
                  'COUNT': AccessLevel(1),
-                 'CREATE': AccessLevel(2),
+                 'INSERT': AccessLevel(2),
                  'UPDATE': AccessLevel(3),
                  'DELETE': AccessLevel(4),
+                 'CREATE': False,
                  'DROP': False,
                  'PRAGMA': False}
 
