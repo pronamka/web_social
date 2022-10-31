@@ -14,6 +14,8 @@ allowed_extensions = ('txt', 'jpg', 'docx', 'jpeg', 'png', 'pdf', 'xlsx', 'jpeg'
 
 
 class ExtensionNotAllowed(PermissionError):
+    __slots__ = 'message'
+
     def __init__(self, filename: str) -> None:
         self.message = f'File with filename {filename} has an unexpected file extension.'
 
@@ -22,6 +24,8 @@ class ExtensionNotAllowed(PermissionError):
 
 
 class SymbolsNotAllowed(OSError):
+    __slots__ = 'message'
+
     def __init__(self, filename: str, symbol: str) -> None:
         self.message = f'File with filename {filename} has unexpected symbols in it.' \
                        f'Symbol that caused this error: {symbol}'
@@ -31,6 +35,7 @@ class SymbolsNotAllowed(OSError):
 
 
 class FileManager:
+    __slots__ = 'file', 'user_id', 'filename', 'protocols'
     upload_path = 'static/upload_folder/'
 
     def __init__(self, file, user_id: int) -> None:
@@ -47,6 +52,7 @@ class FileManager:
                                               self.filename,
                                               date.strftime('%Y-%m-%d'),
                                               date.strftime("%A, %d. %B %Y %H:%M")))
+        # noinspection PyArgumentList
         self.protocols.get(self.get_extension())(self.file)
 
     def get_extension(self) -> str:
