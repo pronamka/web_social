@@ -50,16 +50,17 @@ class Post:
 class PostForDisplay(Post):
     def __init__(self, post_id: int) -> None:
         super(PostForDisplay, self).__init__(post_id)
-        self.author = self._find_author()
+        self.author, self.display_date = self._find_data()
 
-    def _find_author(self) -> str:
-        """Get the author of the post.
+    def _find_data(self) -> tuple[str, str]:
+        """Get the author and the accurate creation date of the post.
         First gets the author if from db, then calls _get_by_id() to get the actual name"""
-        user_id = self.database.get_information(f'SELECT user_id FROM posts WHERE post_id="{self.post_id}"')[0]
-        return self._get_by_id(user_id)
+        data = self.database.get_information(f'SELECT user_id, display_date '
+                                             f'FROM posts WHERE post_id="{self.post_id}"')
+        return self._get_by_id(data[0]), data[1]
 
     def _get_by_id(self, user_id: int) -> str:
-        """Get the login of the user with given id.
+        """Get the login and creation date of the post with given id.
         :param user_id: integer representing an id of a user"""
         return self.database.get_information(f'SELECT login FROM users WHERE id="{user_id}"')[0]
 
@@ -113,8 +114,37 @@ class CommentsRegistry:
 
     def __init__(self, post_id: int) -> None:
         self.post_id = post_id
-        self.comments = self.define_comments()
+        self.comments = {}
         self.counter = 0
+        self.fetch_posts(5)
+
+    def fetch_posts(self, amount: int) -> None:
+        res = self.database.get_all_singles(f'SELECT comment_id FROM comments '
+                                            f'WHERE post_id="{self.post_id}"'
+                                            f' ORDER BY comment_id DESC LIMIT {amount} '
+                                            f'OFFSET {self.counter}')
+        for i in res:
+            self.comments[self.counter] = Comment(i)
+            self.counter += 1
+
+    def get_latest_comments(self, amount: int, start_with: int) -> tuple:
+        """Get available_comment defined amount of user's posts starting from the latest one."""
+        if available_comments := self._check_comments_sufficiency(amount + start_with, amount):
+            comments = tuple(self.comments.values())[start_with:available_comments + start_with]
+            return comments
+
+    def _check_comments_sufficiency(self, length: int, amount: int) -> Optional[int]:
+        """Check if there is enough posts to return.
+        If not, attempt will be made to load some new ones.
+        If there is still not enough to return even one None will be returned."""
+        if length > self.counter:
+            self.fetch_posts(length - self.counter)
+        if (available_comments := self.counter - amount) <= 0 and length > self.counter:
+            return
+        elif length > self.counter and available_comments > 0:
+            return available_comments
+        else:
+            return amount
 
     def define_comments(self, amount: int = 20) -> dict[int: Comment]:
         """Get all the the comments from database."""
@@ -174,13 +204,7 @@ class UserPostRegistry(PostRegistry):
                   start_with: int,
                   author_id: int = None,
                   post_type: [PostForDisplay, FullyFeaturedPost] = PostForDisplay):
-        """This method was described in the parent class.
-        WARNING: this is a generator. To work with its returns, start a for loop.
-        For example: for i in UserPostRegistry.get_posts(10, 0):
-                            print(i)
-        It will yield a PostForDisplay object the amount of times
-        you have given as the parameter."""
-        counter = 0
+        """This method was described in the parent class."""
         if not author_id:
             data = cls.database.get_all_singles(f'SELECT post_id FROM posts ORDER BY '
                                                 f'post_id DESC LIMIT {amount} OFFSET {start_with}')
@@ -188,19 +212,14 @@ class UserPostRegistry(PostRegistry):
             data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE user_id="{author_id}" ORDER BY '
                                                 f'post_id DESC LIMIT {amount} OFFSET {start_with}')
         posts = [post_type(post_id) for post_id in data]
-        while counter < len(posts):
-            yield posts[counter]
-            counter += 1
+        return posts
 
     @classmethod
-    def get_sub_posts(cls, date: str, follows: tuple):
-        counter = 0
+    def get_subscription_posts(cls, date: str, follows: tuple):
         data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE user_id IN {follows} '
                                             f'AND date="{date}"')
         posts = [PostForDisplay(post_id) for post_id in data]
-        while counter < len(posts):
-            yield posts[counter]
-            counter += 1
+        return posts
 
 
 class AdminPostRegistry(PostRegistry):
@@ -213,7 +232,7 @@ class AdminPostRegistry(PostRegistry):
         get_posts method of UserPostRegistry is that here
         FullyFeaturedPost is yielded instead of PostForDisplay."""
         counter = 0
-        data = cls.database.get_all_singles(f'SELECT post_id FROM posts ORDER BY '
+        data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE verified="0" ORDER BY '
                                             f'post_id DESC LIMIT {amount} OFFSET {start_with}')
         posts = [FullyFeaturedPost(post_id) for post_id in data]
         while counter < len(posts):
