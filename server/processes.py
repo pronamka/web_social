@@ -1,4 +1,4 @@
-from typing import Union, Any, Optional, Literal, Callable
+from typing import Union, Any, Literal, Callable
 from enum import Enum
 from datetime import datetime, timedelta
 from json import dumps, JSONEncoder
@@ -13,7 +13,7 @@ from itsdangerous.exc import BadTimeSignature
 from server.app_core import app, users
 from server.database import DataBase
 from server.posts import PostForDisplay, AdminPostRegistry, UserPostRegistry, \
-    FullyFeaturedPost
+    FullyFeaturedPost, CommentsRegistry
 from server.user import UserFactory, Viewer, Author, Admin, UserRole
 from server.managers import Manager, BasicManager
 
@@ -21,6 +21,17 @@ from server.managers import Manager, BasicManager
 def get_user() -> [Viewer, Author, Admin]:
     """Get the user object that corresponds with the client machine."""
     return users.get(session.get('login'))
+
+
+def verify_post(post_id: int) -> None:
+    DataBase(access_level=3).update(f'UPDATE posts SET verified=1 WHERE post_id="{post_id}"')
+
+
+def write_comment(post_id: str, comment_text: str) -> None:
+    data_package = (post_id, str(get_user().get_user_id), comment_text,
+                    datetime.now().strftime("%A, %d. %B %Y %H:%M"))
+    DataBase(access_level=2).create(f'INSERT INTO comments(post_id, user_id, comment, date) '
+                                    f'VALUES(?, ?, ?, ?);', data=data_package)
 
 
 class RegistrationState(Enum):
@@ -51,12 +62,14 @@ def author_required(func: Callable):
             return 0
         else:
             return func(self, *args)
+
     return wrapper
 
 
 class InformationGetter:
     """Class for formalizing and getting information
     for loading pages of development studio."""
+
     def __init__(self, properties: dict, **kwargs):
         """Initialize InformationGetter.
         :param properties: dictionary with all
@@ -74,8 +87,16 @@ class InformationGetter:
                                                     (self.parameters.get('post_id'),)),
                           'post_amount': (self.amount_of_posts,),
                           'latest_posts': (self.get_latest_posts,
-                                           (self.parameters.get('posts_need', 1),
-                                            self.parameters.get('posts_got', 0)))}
+                                           (self.parameters.get('posts_required', 1),
+                                            self.parameters.get('posts_loaded', 0),
+                                            self.parameters.get('of_user', True))),
+                          'dated_posts': (self.get_dated_posts,
+                                          (self.parameters.get('dates_loaded', 0), )),
+                          'latest_comments': (self.get_latest_comments,
+                                           (self.parameters.get('post_id', 0),
+                                            self.parameters.get('comments_required', 1),
+                                            self.parameters.get('comments_loaded', 0),
+                                            self.parameters.get('of_user', True)))}
 
     def get_full_data(self) -> dict:
         """Get all the data that was specified
@@ -101,13 +122,24 @@ class InformationGetter:
         else:
             return func()
 
-    def get_subscriber_amount(self, *args):
+    def get_subscriber_amount(self):
         return self.user.SubscriptionManager.get_followers
 
-    @author_required
-    def get_latest_posts(self, amount: int = 1, start_with: int = 0) \
-            -> tuple[FullyFeaturedPost]:
-        return self.user.PostManager.get_latest_posts(amount, start_with)
+    def get_latest_comments(self, post_id: int, amount: int = 1, start_with: int = 0,
+                         of_user: bool = True) -> tuple[FullyFeaturedPost]:
+        print(post_id, amount, start_with)
+        if of_user:
+            """May be used later for displaying analytics page."""
+            ...
+        else:
+            return CommentsRegistry(post_id).get_latest_comments(amount, start_with)
+
+    def get_latest_posts(self, amount: int = 1, start_with: int = 0,
+                         of_user: bool = True) -> tuple[FullyFeaturedPost]:
+        if of_user:
+            return self.user.PostManager.get_latest_posts(amount, start_with)
+        else:
+            return UserPostRegistry.get_posts(amount, start_with)
 
     def amount_of_commentaries_made(self, *args):
         ...
@@ -117,8 +149,22 @@ class InformationGetter:
         return self.user.PostManager.get_comments_amount(post_id)
 
     @author_required
-    def amount_of_posts(self, *args):
+    def amount_of_posts(self):
         return self.user.PostManager.get_post_amount()
+
+    def get_dated_posts(self, dates_got: int = 0):
+        today = datetime.today()
+        required_date = (today - timedelta(dates_got)).strftime('%Y-%m-%d')
+        follows = self.user.SubscriptionManager.get_follows
+        post_manager = UserPostRegistry()
+        posts = post_manager.get_subscription_posts(required_date, follows)
+        while not posts and required_date > '2022-09-15':  # 2022-09-15 is the date
+            # of first post ever created. If the date goes below that, there is no need
+            # to look for new posts, as there are none of them.
+            dates_got += 1
+            required_date = (today - timedelta(dates_got)).strftime('%Y-%m-%d')
+            posts = post_manager.get_subscription_posts(required_date, follows)
+        return posts, required_date, dates_got
 
 
 class PostLoader:
@@ -137,50 +183,29 @@ class PostLoader:
         """Get whatever info you want specified in protocols
         (info and other parameters should be passed as request arguments)"""
         params = request.json
-        protocols = {'hub': {'latest_posts': 'object',
-                             'commentaries_received': 'amount',
-                             'post_amount': 'object',
-                             'subscribers': 'amount'},
-                     'content': {'latest_posts': 'object'}}
+        protocols = {
+            'main_user_page': {'latest_posts': 'object'},
+            'subscription_page': {'dated_posts': 'object'},
+            'view_post_page': {'latest_comments': 'object'},
+            'hub': {'latest_posts': 'object',
+                    'commentaries_received': 'amount',
+                    'post_amount': 'object',
+                    'subscribers': 'amount'},
+            'content': {'latest_posts': 'object'}}
         data = InformationGetter(protocols.get(params.get('page')),
                                  parameters=params).get_full_data()
         return dumps(data, cls=Encoder)
 
     @staticmethod
-    @app.route('/extend_posts', methods=['GET', 'POST'])
-    def extend_posts() -> str:
-        #  the js on the client side calls this when posts need to be loaded.
-        data = {}
-        post_amount = 4
-        count = request.json
-        for i in enumerate(UserPostRegistry.get_posts(post_amount, int(count) * post_amount)):
-            data[i[0]] = i[1]
-        return dumps(data, cls=Encoder)
-
-    @staticmethod
-    @app.route('/extend_sub_posts', methods=['GET', 'POST'])
-    def extend_sub_posts():
-        data = {}
-        req_date = (datetime.today() - timedelta(int(request.json))).strftime('%Y-%m-%d')
-        print(req_date)
-        for i in enumerate(UserPostRegistry.get_sub_posts(req_date,
-                                                          get_user().SubscriptionManager.get_follows)):
-            data[i[0]] = i[1]
-        data['date'] = req_date
-        return dumps(data, cls=Encoder)
-
-    @staticmethod
     @app.route('/admin_get_posts', methods=['GET', 'POST'])
     def admin_get_posts() -> str:
-        #  the js on the client side calls this when posts need to be loaded
-        #  for admin.
-        # post verification system should be added
+        # the js on the client side calls this when posts need to be loaded
+        # for admin.
+        # post verification system should be implemented
         data = {}
-        post_amount = 2
-        count = request.json
-        for i in enumerate(AdminPostRegistry.get_posts(post_amount, int(count) * 2)):
+        posts_loaded, posts_required = request.json.values()
+        for i in enumerate(AdminPostRegistry.get_posts(posts_required, posts_loaded)):
             data[i[0]] = i[1]
-        print(data)
         return dumps(data, cls=Encoder)
 
 
@@ -399,6 +424,46 @@ class Token:
             return True
         except BadTimeSignature:
             return False
+
+
+class EmailBanMessageSender:
+
+    standard_message = 'Dear {}, \n' \
+               'This message is sent to you by PronScience to ' \
+               'inform you that one of your posts - "{}" ' \
+               'was banned for the following reason: "{}". \n' \
+               'If you have any questions or complains, please contact the ' \
+               'member of our post-checking crew on the platform or ' \
+               'at {}.'
+
+    def __init__(self, post_id: int, problem_description: str):
+        self.mail = Mail(app)
+        self.problem_description = problem_description
+        self.current_admin = UserFactory().create_admin(1)
+        self.current_post = FullyFeaturedPost(post_id)
+        self.user_data = self._get_user_data(self.current_post.get_author)
+
+    def send_ban_notification(self) -> None:
+        self._update_post_status()
+        self.mail.send(self._build_message())
+
+    def _update_post_status(self):
+        DataBase(access_level=3).update(f'UPDATE posts SET '
+                                        f'verified=2 WHERE post_id="{self.current_post.get_id}"')
+
+    def _build_message(self):
+        message = Message(f'Post "{self.current_post.get_title}" was banned.',
+                          recipients=[self.user_data[1]],
+                          sender=('PronScience', 'defender0508@gmail.com'))
+        body = self.standard_message.format(self.user_data[0], self.current_post.get_title,
+                                            self.problem_description, self.current_admin.get_email)
+        message.html = body
+        return message
+
+    @staticmethod
+    def _get_user_data(login: str) -> tuple[str, str]:
+        return login, \
+               DataBase().get_information(f'SELECT email FROM users WHERE login="{login}"')[0]
 
 
 class EmailConfirmationHandler(Manager):
