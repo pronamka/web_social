@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ location }}</title>
+    <style>
+        #verify_btn{
+            background-color: green;
+            color: white;
+        }
+        #ban_btn{
+            background-color: red;
+            color: white;
+        }
+        #problem_description{
+            display: inline-block;
+        }
+        #actions_dv{
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <dialog id="warning_dlg">
+    </dialog>
+    <meta name="viewport" content="width=device-width">
+    <main role="main">
+        <article>
+            <div id="post_page">
+                <div id="post">
+                    <iframe src="{{ url_for('static', filename= post.get_path) }}" width="800px" height="1100px"></iframe>
+                </div>
+            </div>
+            <div id="actions_dv">
+                <textarea placeholder="Problem description" id="problem_description"></textarea>
+                <button onclick="verify_post('{{ post.get_id }}');" id="verify_btn">Verify</button>
+                <button onclick="ban_post('{{ post.get_id }}');" id="ban_btn">Ban</button>
+            </div>
+        </article>
+    </main>
+    <script>
+        var warning_dialog = document.getElementById('warning_dlg')
+        const verify_btn = document.getElementById('verify_btn')
+        const ban_btn = document.getElementById('ban_btn')
+
+        function sendRequest(method, url, body) {
+            const headers = {'Content-Type': 'application/json'}
+            return fetch(url, {
+                method: method,
+                body: JSON.stringify(body),
+                headers: headers}).then(response => {
+                return response.text()
+            })
+        }
+
+        function verify_post(post_id){
+            sendRequest('POST', '/admin/verify_post/', post_id).then(resp => respond(resp, 'verified'))
+        }
+
+        function ban_post(post_id){
+            problem_description = document.getElementById('problem_description').value
+            if (problem_description.length > 0){
+                sendRequest('POST', '/admin/ban_post/', {'post_id': post_id, 
+                'problem_description': problem_description}).then(resp => respond(resp, 'banned'))
+            }
+            else{
+                alert('Please, describe why do you want to ban the post.')
+            }
+        }
+
+        function respond(status_message, action){
+            console.log(status_message)
+            const status = JSON.parse(status_message)['status']
+            if (status == 'successful') {
+                verify_btn.disabled = true
+                ban_btn.disabled = true
+                alert('Post banned successfully.')
+            }
+            else {
+                var message = document.createElement('p')
+                message.appendChild(document.createTextNode(`The post was not `+ action +` because an error
+                    occured on the server side: `+ status +`. Please, 
+                    contact our technical support at defender0508@gmail.com.`))
+                warning_dialog.appendChild(message)
+                warning_dialog.showModal()
+            }
+        }
+    </script>
+</body>
+</html>
