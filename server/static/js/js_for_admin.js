@@ -1,45 +1,42 @@
 const request_url = '/admin_get_posts'
 var posts = {}
-var extension_amount = -1
+var extension_amount = 0
 
-document.addEventListener('DOMContentLoaded', getPosts());
+document.addEventListener('DOMContentLoaded', getPosts(2));
 
 
-function sendRequest(method, url) {
+function sendRequest(method, url, body) {
     const headers = {'Content-Type': 'application/json'}
-    extension_amount = extension_amount+1;
     return fetch(url, {
         method: method,
-        body: JSON.stringify(extension_amount),
+        body: JSON.stringify(body),
         headers: headers}).then(response => {
         return response.text()
     })
 }
 
-function getPosts(){
-    sendRequest('POST', request_url).then(resp => {
-        post_json = JSON.parse(resp);
+function getPosts(amount){
+    sendRequest('POST', request_url, 
+    {'posts_loaded': extension_amount, 'posts_required': amount}).then(resp => {
+        post_json = JSON.parse(resp)
+        extension_amount += amount
         buildPosts(post_json);
     })
 }
 function buildPosts(post_dict){
     for (var i=0, l=Object.keys(post_dict).length; i<=l; i++){
-        var comments = '';
         try{
-            comments = buildComments(post_dict[i]['comment_registry']['comments']);
             title = post_dict[i]['title'];
             author = post_dict[i]['author'];
             post_id = post_dict[i]['post_id'];
+            creation_date = post_dict[i]['display_date']
             path = '/static/upload_folder/'+title;
-            if (comments==''){
-                comments='<ul><li>No comments yet</li></ul>'
-            }
-            post = buildHTML(path, author, title, post_id, comments);
+            post = buildHTML(path, author, title, post_id, creation_date);
             addPost(post);
         }
         catch(error){
             if (error != "TypeError: Cannot read properties of undefined (reading 'comment_registry')"){
-                console.log(`An error has occured:` +error+`\nPlease, contact our leading backend developer at defender0508@gmail.com`);
+                console.log('An error has occured:'+error)
             }
             else {
                 comments = 'No comments yet.'
@@ -47,37 +44,33 @@ function buildPosts(post_dict){
         }
     }
 }
-function buildHTML(path, author, title, post_id, comments){
-    html = `<div class="table_cell">
+function buildHTML(path, author, title, post_id, creation_date){
+    html = `<div class="table_cell" id="`+post_id+`">
             <iframe width="400" height="500" src="`+ path+`"></iframe>
+            <button onclick="verify_post(`+post_id+`);">Verify</button>
+            <button onclick="window.location.href='/admin/examine_post/?post_id=`+ post_id+`'">Examine</button>
             <details class="post_data" open>
                 <summary>Post information</summary>
                 <ul>
                 <li>Title: `+title+`</li>
                 <li>Author: `+author+`</li>
                 <li>Post id: `+post_id+`</li>
-                <li><details>
-                    <summary>Comment Registry</summary>`+comments+
-                `</details></li>
+                <li>Created on:`+creation_date+`</li>
                 </ul>
             </details>
         </div>`;
     return html
 }
-
-function buildComments(comment_section){
-    comments = '';
-    for (var j=1, ln=Object.keys(comment_section).length; j<=ln; j++){
-        if (Object.keys(comment_section).length > 0){
-            comments = comments +  `<ul><details>
-                <summary>Comment id: `+comment_section[j]['comment_id']+`</summary>
-                <li class="comment_info">Comment author: `+comment_section[j]['author']+`</li>
-                <li class="comment_info">Comment text: `+comment_section[j]['text']+`</li>
-            </details></ul>`
-        }
+function verify_post(post_id){
+    sendRequest('POST', '/admin/verify_post/', post_id).then(resp => {
+        const verified_post = document.getElementById(post_id)
+        verified_post.remove()
+        extension_amount -= 1
+        getPosts(1)
     }
-    return comments
+    )
 }
+
 
 function addPost(html) {
     const tab = document.getElementById('posts_table');
@@ -87,24 +80,11 @@ function addPost(html) {
     tab.appendChild(template.content);
     return template.content.firstChild;
 }
-
-`function load_on_scroll(){}
-    $(document).ready(function(){
-        $(window).bind('scroll', extensionNeedChecker)
-        function extensionNeedChecker(){
-            console.log($(document).height())
-            console.log($(window).height())
-            if ($(window).scrollTop() >= $(document).height()-$(window).height() - 300){
-                getPosts();
-            }
-        }
-    })`
 current_position = 250
 window.addEventListener("scroll", function(event) {
     var top = this.scrollY
-    console.log(top, current_position)
     if (current_position < top){
         current_position += 1000
-        getPosts();
+        getPosts(2);
     } 
 }, false);
