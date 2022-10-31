@@ -6,7 +6,7 @@ from typing import Callable, Union
 class NoPermission(PermissionError):
     def __init__(self, func: Callable, arguments: tuple):
         self.message = f"Failed to call {func} with {arguments} - No permission. \n" \
-                               f"If you encountered this error, please contact us at defender0508@gmeail.com."
+                       f"If you encountered this error, please contact us at defender0508@gmeail.com."
 
     def __str__(self):
         return self.message
@@ -15,8 +15,8 @@ class NoPermission(PermissionError):
 class InternalError(TypeError):
     def __init__(self, func: Callable, arguments: tuple, error: TypeError):
         self.message = f"Failed to call {func} with {arguments}.\n" \
-                              f"Function responded with '{error}'.\n" \
-                              f"If you encountered this error, please contact us at defender0508@gmeail.com."
+                       f"Function responded with '{error}'.\n" \
+                       f"If you encountered this error, please contact us at defender0508@gmeail.com."
 
     def __str__(self):
         return self.message
@@ -26,7 +26,17 @@ class DataBaseInteractError(db_Error):
     def __init__(self, func: str, arguments: tuple, error: db_Error):
         self.message = f"Failed to call {func} method of {arguments[0]} with parameters {arguments[1:-1]}.\n" \
                        f"Error while interacting with database: {error}. \n" \
-                        f"If you encountered this error, please contact us at defender0508@gmeail.com."
+                       f"If you encountered this error, please contact us at defender0508@gmeail.com."
+
+    def __str__(self):
+        return self.message
+
+
+class UnknownCommand(db_Error):
+    def __init__(self, func: Callable, arguments: tuple):
+        self.message = f'Failed to call {func} with request "{arguments}": The command you were trying to ' \
+                       f'execute does not exist.\n' \
+                       f'If you encountered this error, please contact us at defender0508@gmeail.com.'
 
     def __str__(self):
         return self.message
@@ -39,6 +49,12 @@ class AccessLevel(Enum):
     Update = 3
     Delete = 4
 
+    def __lt__(self, other):
+        return self.value < other.value
+
+    def __le__(self, other):
+        return self.value <= other.value
+
 
 operations_access_required = {'get_information': AccessLevel(1),
                               'get_many': AccessLevel(1),
@@ -49,15 +65,36 @@ operations_access_required = {'get_information': AccessLevel(1),
                               'update': AccessLevel(3),
                               'delete': AccessLevel(4)}
 
+operations_keywords = {AccessLevel(1): ['SELECT', 'COUNT'],
+                       AccessLevel(2): ['CREATE'],
+                       AccessLevel(3): ['UPDATE'],
+                       AccessLevel(4): ['DELETE'],
+                       'forbidden': ['DROP']}
+
+operations_rev = {AccessLevel(1): ['CREATE', 'UPDATE', 'DELETE', 'DROP', 'PRAGMA'],
+                  AccessLevel(2): ['UPDATE', 'DELETE', 'DROP', 'PRAGMA'],
+                  AccessLevel(3): ['DELETE', 'DROP', 'PRAGMA'],
+                  AccessLevel(4): ['DROP', 'PRAGMA', '']}
+
+commands_dict = {'SELECT': AccessLevel(1),
+                 'COUNT': AccessLevel(1),
+                 'CREATE': AccessLevel(2),
+                 'UPDATE': AccessLevel(3),
+                 'DELETE': AccessLevel(4),
+                 'DROP': False,
+                 'PRAGMA': False}
+
 
 def safe_execution(func: Callable) -> Union[AssertionError, Callable]:
     """Catches the errors, if they occur while interacting with database.
     Ensures that given DataBase instance has enough rights to execute the sql query.
-    Use this function as a decorator for class methods."""
+    Used as a decorator for class methods."""
 
     def wrapper(*args, **kwargs):
-        if args[0].get_access_level.value >= operations_access_required.get(f'{func}'.split(' ', 2)[1][9:]).value:
+        if (access_level := args[0].get_access_level) >= \
+                operations_access_required.get(f'{func}'.split(' ', 2)[1][9:]):
             sql = args[1]
+            check_request(func, sql, access_level)
             try:
                 return func(args[0], sql, kwargs)
             except TypeError as error:
@@ -68,6 +105,15 @@ def safe_execution(func: Callable) -> Union[AssertionError, Callable]:
             raise NoPermission(func, (args, kwargs))
 
     return wrapper
+
+
+def check_request(func: Callable, request: str, access_level: AccessLevel):
+    command = request.split()[0]
+    if command in commands_dict:
+        if not (op_ac_level := commands_dict.get(command)) or op_ac_level > access_level:
+            raise NoPermission(func, (request,))
+    else:
+        raise UnknownCommand(func, (request, ))
 
 
 class DataBase:
