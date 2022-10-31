@@ -11,20 +11,86 @@
         </div>
         <div class="comment_section">
             <div id="leave_comment">
-                 <form action="/private/{{login}}/leave_comment" method="post">
-                     <textarea placeholder="Your comment" name="comment"></textarea>
-                     <input type="submit" value="Send" name="add_comment">
-                 </form>
+                <textarea placeholder="Your comment" id="comment"></textarea>
+                <button id="send_comment_btn" onclick="sendComment('{{post.get_id}}');">
                 <p style="font-family: 'Evanston Tavern 1826'; color: red; font-size: large;">{{errors}}</p>
             </div>
-            <p>All comments:</p>
-            {% for i in post.get_comments %}
+            <p>Comments:</p>
             <div class="horizontal_line2"></div>
-                <p class="additional_info">{{i.get_author}}</p>
-                <p class="main_comment">{{i.get_text}}</p>
-            {%endfor %}
+            <div id="comments_dv"></div>
         </div>
     </div>
     </article>
 </main>
+<script>
+    const comment = document.getElementById('comment')
+    const post_id = '{{post.get_id}}'
+    const settings = {'page': 'view_post_page', 'post_id': post_id, 'comments_loaded': 0, 'comments_required': 5, 'of_user': 0}
+    document.addEventListener('DOMContentLoaded', loadComments())
+    
+    function sendRequest(method, url, body) {
+        const headers = {'Content-Type': 'application/json'}
+        return fetch(url, {
+            method: method,
+            body: JSON.stringify(body),
+            headers: headers}).then(response => {
+            return response.text()
+        })
+    }
+    function sendComment(post_id){
+        sendRequest('POST', '/comment/', {'post_id': post_id, 
+        'comment_text': comment.value}).then(resp=>{})
+    }
+    function loadComments(){
+        console.log(settings)
+        sendRequest('POST', '/load_info/', settings).then(resp=>{
+            comments_dict = JSON.parse(resp)
+            console.log(comments_dict)
+            settings['comments_loaded'] += 'comments_required'
+            buildComments(comments_dict['latest_comments'])
+        })}
+    function buildComments(comments){
+        for (var i=0, l=Object.keys(comments).length-1; i<=l; i++){
+            var new_comment = new Comment(comments[i])
+            addComment(new_comment)
+        }
+    }
+    function addComment(comment){
+        html = `<div class="comment">
+            <em>`+comment.author+`, at `+comment.date+`</em>
+            <p>`+comment.text+`</p>
+            </div>`
+        insertHTML('#comments_dv', html)
+    }
+    class Comment{
+        constructor(comments_item){
+            console.log(comments_item)
+            this.comment_author = comments_item['author'];
+            this.creation_date = comments_item['date'];
+            this.comment = comments_item['text'];
+        }
+        get allValues(){
+            return (this.author, this.creation_date, this.text);
+        }
+        get author(){
+            return this.comment_author
+        }
+        get date(){
+            return this.creation_date
+        }
+        get text(){
+            return this.comment
+        }
+        
+    }
+    function insertHTML(direction, html) {
+        const tab = document.querySelector(direction);
+        var template = document.createElement('template');
+        html = html.trim(); // Never return a text node of whitespace as the result
+        template.innerHTML = html;
+        tab.appendChild(template.content);
+        return template.content.firstChild;
+    }
+    
+</script>
 {% endblock %}
