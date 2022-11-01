@@ -10,6 +10,11 @@
             <iframe src="{{ url_for('static', filename= post.get_path) }}" width="800px" height="1100px"></iframe>
         </div>
         <div class="comment_section">
+            <div id="author_info">
+                <img src="{{ url_for('static', filename= post.get_author_avatar) }}" class="avatar">
+                <h2 id="author_login">{{ post.get_author }}</h2>
+                <button id="subscribe-btn" onclick="change_subscriptions()">Subscribe</button>
+            </div>
             <div id="leave_comment">
                 <textarea placeholder="Your comment" id="comment"></textarea>
                 <button id="send_comment_btn" onclick="sendComment('{{post.get_id}}');">
@@ -17,15 +22,24 @@
             </div>
             <p>Comments:</p>
             <div class="horizontal_line2"></div>
-            <div id="comments_dv"></div>
+            <div>
+                <div id="comments_dv"></div>
+                <button onclick="loadComments()" id="load_comments_btn">See more</button>
+            </div>
         </div>
     </div>
     </article>
 </main>
 <script>
     const comment = document.getElementById('comment')
+    const load_comments_btn = document.getElementById('load_comments_btn')
     const post_id = '{{post.get_id}}'
-    const settings = {'page': 'view_post_page', 'post_id': post_id, 'comments_loaded': 0, 'comments_required': 5, 'of_user': 0}
+    const author_id = '{{post.get_author_id}}'
+    const settings = {'page': 'view_post_page', 
+                      'post_id': post_id, 
+                      'comments_loaded': 0, 
+                      'comments_required': 5, 
+                      'of_user': 0}
     document.addEventListener('DOMContentLoaded', loadComments())
     
     function sendRequest(method, url, body) {
@@ -37,22 +51,60 @@
             return response.text()
         })
     }
+    class subscribeButton{
+        constructor(button_item){
+            this.button = button_item
+            this.status = this.defineStatus()
+            this.states = {'subscribed': {'action': 0, 'status': 'unsubscribed'}, 
+                      'unsubscribed': {'action': 1, 'status': 'subscribed'}}
+        }
+        defineStatus(){
+            const protocols = {'True': 'subscribed', 'False': 'unsubscribed'}
+            var current_status = "{{ post.get_author_id in current_user_follows }}"
+            this.setStyleSheet(protocols[current_status])
+            return protocols[current_status]
+        }
+        changeStatus(){
+            const new_status = this.states[this.status]['status']
+            sendRequest('POST', '/change_subscriptions/', 
+            {'author_id': author_id, 'action': this.states[this.status]['action']}).then(resp => {
+                this.setStyleSheet(new_status)
+                this.status = new_status
+            })
+        }
+        setStyleSheet(style_sheet_name){
+            const styles = {'unsubscribed': {'b_c': 'red', 't_c': 'white', 't': 'Subscribe'},
+                      'subscribed': {'b_c': 'grey', 't_c': 'white', 't': 'Subscribed'}}
+            this.button.style.backgroundColor = styles[style_sheet_name]['b_c']
+            this.button.style.color = styles[style_sheet_name]['t_c']
+            this.button.firstChild.data =styles[style_sheet_name]['t']
+        }
+    }
+    const subscribe_btn = new subscribeButton(document.getElementById('subscribe-btn'))
+    function change_subscriptions(){
+        subscribe_btn.changeStatus()
+    }
+
     function sendComment(post_id){
         sendRequest('POST', '/comment/', {'post_id': post_id, 
         'comment_text': comment.value}).then(resp=>{})
     }
+
     function loadComments(){
-        console.log(settings)
         sendRequest('POST', '/load_info/', settings).then(resp=>{
             comments_dict = JSON.parse(resp)
-            console.log(comments_dict)
-            settings['comments_loaded'] += 'comments_required'
+            settings['comments_loaded'] += settings['comments_required']
             buildComments(comments_dict['latest_comments'])
         })}
+    
     function buildComments(comments){
-        for (var i=0, l=Object.keys(comments).length-1; i<=l; i++){
+        const comment_amount = Object.keys(comments).length-1
+        for (var i=0, l=comment_amount; i<=l; i++){
             var new_comment = new Comment(comments[i])
             addComment(new_comment)
+        }
+        if (comment_amount < 4){
+            load_comments_btn.remove()
         }
     }
     function addComment(comment){
@@ -64,7 +116,6 @@
     }
     class Comment{
         constructor(comments_item){
-            console.log(comments_item)
             this.comment_author = comments_item['author'];
             this.creation_date = comments_item['date'];
             this.comment = comments_item['text'];
