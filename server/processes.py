@@ -125,7 +125,8 @@ class InformationGetter:
     def get_subscriber_amount(self):
         return self.user.SubscriptionManager.get_followers
 
-    def get_latest_comments(self, post_id: int, amount: int = 1, start_with: int = 0,
+    @staticmethod
+    def get_latest_comments(post_id: int, amount: int = 1, start_with: int = 0,
                          of_user: bool = True) -> tuple[FullyFeaturedPost]:
         print(post_id, amount, start_with)
         if of_user:
@@ -261,6 +262,7 @@ class LogInHandler(Manager):
         Used to re-login user if he already has an active session"""
         users.pop(session.get('login'))
         self._log_in(login)
+        self.status = LogInState.CredentialsFine
 
     def log_user(self) -> tuple:
         """General function that launches all the processes of logging in"""
@@ -299,7 +301,7 @@ class LogInHandler(Manager):
         elif self.database.get_information(f'SELECT status FROM users WHERE '
                                            f'login="{self.login}"')[0] != 1:
             self.status = LogInState.EmailNotConfirmed
-        elif not session.get('login') != self.login:
+        elif (lg := session.get('login')) and lg != self.login:
             self.status = LogInState.UserAlreadyLoggedIn
         else:
             self.status = LogInState.CredentialsFine
