@@ -3,7 +3,7 @@ from threading import Thread
 from functools import wraps
 
 from flask import render_template, request, url_for, redirect, Response, abort
-from flask_login import login_required, logout_user
+from flask_login import logout_user
 from flask import session
 
 from server.app_core import app, login_manager, users
@@ -26,11 +26,7 @@ from server.user import UserFactory, UserRole
 #
 # Add events system for handling registration, log in and other processes.
 #
-# Add different pages and features for users and admins.
-#
 # Add a search system.
-#
-# Add a way to comment and subscribe.
 #
 # Add likes, views.
 #
@@ -39,6 +35,9 @@ from server.user import UserFactory, UserRole
 # Add a way to copyright posts.
 #
 # Add a way to redact posts for admins.
+#
+# Add a channel page where users will be able to see the posts and information about
+#  other user.
 #
 # Load developer studio page:
 #   Write a function to give the client information to display hub
@@ -53,6 +52,43 @@ from server.user import UserFactory, UserRole
 
 temp = {}  # a very bad solution, should solve this resend email problem somehow else
 Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
+
+
+def login_required(current_session):
+
+    """
+    If you decorate a view with this, it will ensure that the current user is
+    logged in and authenticated before calling the actual view.
+    Note: this method is taken from flask-login library and slightly re-written
+    to fit the system. Do not import this function from flask-login to avoid errors."""
+    def decorated_view(function):
+        @wraps(function)
+        def fixed_decorated_view(*args, **kwargs):
+            if request.method in {"OPTIONS"} or app.config.get("LOGIN_DISABLED"):
+                pass
+            elif not current_session.get('login'):
+                return app.login_manager.unauthorized()
+
+            # flask 1.x compatibility
+            # current_app.ensure_sync is only available in Flask >= 2.0
+            if callable(getattr(app, "ensure_sync", None)):
+                return app.ensure_sync(function)(*args, **kwargs)
+            return function(*args, **kwargs)
+        return fixed_decorated_view
+    return decorated_view
+
+
+def admin_required(func: Callable):
+    @wraps(func)
+    def wrapper():
+        if get_user().get_role == UserRole.Admin:
+            try:
+                return func()
+            except AssertionError as e:
+                return {'status': f'{e.__class__.__name__}: {e}'}
+        else:
+            return abort(418)
+    return wrapper
 
 
 def register() -> Union[Response, str]:
@@ -91,7 +127,6 @@ def registration_page() -> Union[Response, str]:
 
 
 def log_in():
-    session.clear()  # this here is only to make testing easier, should be deleted before deployment
     log_in_handler = LogInHandler()
     log_in_handler.log_user()
     responses = {1: render_template('log_in_page.html', errors='Wrong credentials.'),
@@ -110,7 +145,7 @@ def log_in():
 def log_in_anyways(login: str) -> Response:
     log_in_handler = LogInHandler()
     log_in_handler.force_log_in(login)
-    if log_in_handler.status.value == 4:
+    if log_in_handler.status.value == 5:
         return redirect('/admin/')
     else:
         return redirect(url_for('personal_page'))
@@ -122,19 +157,6 @@ def log_in_page() -> Union[Response, str]:
         return render_template('log_in_page.html')
     else:
         return log_in()
-
-
-def admin_required(func: Callable):
-    @wraps(func)
-    def wrapper():
-        if get_user().get_role == UserRole.Admin:
-            try:
-                return func()
-            except AssertionError as e:
-                return {'status': f'{e.__class__.__name__}: {e}'}
-        else:
-            return abort(418)
-    return wrapper
 
 
 @app.route('/admin/examine_post/', methods=['GET', 'POST'],
@@ -191,7 +213,8 @@ def subscribed_to_videos():
 @login_required(session)
 def view_post():
     post = FullyFeaturedPost(int(request.args.to_dict().get('post_id')))
-    return render_template('personal_pages/post_page.html', post=post)
+    return render_template('personal_pages/post_page.html', post=post,
+                           current_user_follows=get_user().SubscriptionManager.get_follows)
 
 
 @app.route('/comment/', methods=['GET', 'POST'])
@@ -199,15 +222,21 @@ def view_post():
 def add_comment():
     post_id, comment_text = request.json.values()
     write_comment(post_id, comment_text)
-    return 'a'
+    return Response(status=200)
+
+
+@app.route('/change_subscriptions/', methods=['GET', 'POST'])
+@login_required(session)
+def change_subscriptions():
+    author_id, action = map(int, request.json.values())
+    manager = get_user().SubscriptionManager
+    pro = {0: manager.unfollow, 1: manager.follow}
+    pro.get(action)(author_id)
+    return Response(status=200)
 
 
 @app.route('/development_studio/')
 def dev_studio():
-    session['login'] = 'prona'  # this here is only to make the testing easier
-    session['id'] = '2'
-    users['prona'] = UserFactory.create_author(2)  # (so i don't have to clear session,
-    # and log in again every time i want to load the page)
     return render_template('personal_pages/post_developer_pages/dev_studio.html')
 
 
@@ -243,15 +272,6 @@ def load_user(user_id: str):
         return get_user()
     else:
         return None
-
-
-@app.route('/')
-def clear_session():
-    #  This is just to clear the session easier, as I can't log in
-    #  if I restarted the server but never closed my browser window.
-    #  This view is going to be removed when development is over.
-    session.clear()
-    abort(404)
 
 
 app.run('0.0.0.0', port=4000, debug=True, use_debugger=True, use_reloader=True)
