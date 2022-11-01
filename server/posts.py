@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+import os
 
 from server.database import DataBase
 
@@ -175,6 +176,26 @@ class FullyFeaturedPost(PostForDisplay):
     def __init__(self, post_id: int) -> None:
         super().__init__(post_id)
         self.comment_registry = CommentsRegistry(self.post_id)
+        self.author_id = self._define_author_id()
+        self.author_avatar = self._get_author_avatar()
+
+    def _define_author_id(self):
+        return self.database.get_information(f'SELECT id FROM '
+                                             f'users WHERE login="{self.get_author}"')[0]
+
+    def _get_author_avatar(self):
+        if os.path.exists('static/avatar_images/'+str(self.get_author_id)+'.jpeg'):
+            return 'avatar_images/'+str(self.get_author_id)+'.jpeg'
+        else:
+            return 'avatar_images/0.jpeg'
+
+    @property
+    def get_author_avatar(self):
+        return self.author_avatar
+
+    @property
+    def get_author_id(self):
+        return self.author_id
 
     @property
     def get_comments(self) -> CommentsRegistry:
@@ -216,6 +237,8 @@ class UserPostRegistry(PostRegistry):
 
     @classmethod
     def get_subscription_posts(cls, date: str, follows: tuple):
+        if len(follows) == 1:
+            follows = (0, follows[0])
         data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE user_id IN {follows} '
                                             f'AND date="{date}"')
         posts = [PostForDisplay(post_id) for post_id in data]
