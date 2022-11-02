@@ -7,63 +7,36 @@
     <meta name="viewport" content="width=device-width">
 </head>
 <body>
+    <dialog id="restore_password_dlg">
+        <h2>Restore password</h2>
+        <input type="text" id="email" placeholder="email">
+        <p>or</p>
+        <input type="text" id="restore_by_login" placeholder="login">
+        <button onclick="cancel('restore_password_dlg');" class="modal_cancel_button">Cancel</button>
+        <button onclick="restore()">Send email</button>
+        <p id="error"></p>
+    </dialog>
+
+    <dialog id="change_session_dlg">
+        <h2>Warning</h2>
+        <p id="warning_message"></p>
+        <button onclick="cancel('change_session_dlg');" class="modal_cancel_button">Cancel</button>
+        <button onclick="changeSession()">Ok</button>
+    </dialog>
+
     <div class="container">
-        <h1>Pronamka's Service</h1>
-        <h2>Logging In</h2>
+        <h1>PronScience</h1>
+        <h2>Log In</h2>
         <img src="{{ url_for('static', filename='images/enter.png') }}">
         <p id="near_image">Log in your account to acces all the functions</p>
-        <form action="" method="post" onsubmit="checkInputs();">
-            <input name="login" placeholder="login" type="text"  class="info" id="login" accesskey="l">
-            <input name="password" placeholder="password" type="password" class="info" id="password" accesskey="p">
-            <input type="submit" value="Log in" id="log_in">
-        </form>
+
+        <input name="login" placeholder="login" type="text"  class="info" id="login" accesskey="l">
+        <input name="password" placeholder="password" type="password" class="info" id="password" accesskey="p">
+        <button value="Log in" id="log_in" onclick="logIn()"></button>
+
+        <a onclick="showRestorePasswordDialog()" href="#">Forgot your password?</a>
         <p id="validation_errors">{{errors}}</p>
     </div>
-    <div class="modal modal__show" id='modal_window' style="display: none;">
-        <div class="modal__backdrop" data-dismiss="modal">
-            <div class="modal__content">
-                <div class="modal__header">
-                    <div class="modal__title" data-modal="title">
-                        <p>Warning</p>
-                    </div>
-                    <span class="modal__btn-close" data-dismiss="modal" title="Close">
-                        <a onclick="cancel();">×</a>
-                    </span>
-                </div>
-                <div class="modal__body" data-modal="content">You are already logged in as 
-                    {{ logged_as }}<br>
-                Log in anyways? (Your previous session will be closed)</div>
-                <div class="modal__footer">
-                    <button onclick="cancel();" class="modal_cancel_button">Cancel</button>
-                    <form action="/log_in_anyways/{{ name }}" method="get">
-                        <button onclick="ok();">Ok</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-<script>
-    document.addEventListener('DOMContentLoaded', show_warning());
-    function show_warning() {
-        if ("{{ already_logged_in}}" == "True") {
-            modal_window.style.display='block';
-        }
-    }
-    function cancel() {
-        modal_window.style.display="none";
-    }
-    function checkInputs(){
-        login = document.getElementById('login').value;
-        password = document.getElementById('password').value;
-        if (login == '' | password == ''){
-            event.preventDefault();
-            document.getElementById('validation_errors').innerHTML='Please, fill in all the fields.';
-            return false;
-        }
-        else{
-            return true;
-        }
-    }
-</script>
+    <script src="{{ url_for('static', filename='js/js_for_log_in_page.js') }}"></script>
 </body>
 </html>
