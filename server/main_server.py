@@ -8,7 +8,7 @@ from flask import session
 
 from server.app_core import app, login_manager, users
 from server.processes import RegistrationHandler, LogInHandler, EmailBanMessageSender, \
-    get_user, verify_post, write_comment
+    get_user, verify_post, write_comment, RestorePasswordNotificationSender
 from server.utils import UsersObserver, FileManager
 from server.posts import FullyFeaturedPost
 from server.user import UserFactory, UserRole
@@ -21,8 +21,6 @@ from server.user import UserFactory, UserRole
 #   2)Loading post with specific date on subscription page requires accessing
 #   database numerous times to find anything. It should only require accessing
 #   it one time, and looking for the first entry instead.
-#
-# Add a way for users to restore passwords if forgotten.
 #
 # Add events system for handling registration, log in and other processes.
 #
@@ -40,8 +38,6 @@ from server.user import UserFactory, UserRole
 #  other user.
 #
 # Load developer studio page:
-#   Write a function to give the client information to display hub
-#   Add a way to comment
 #   Add content to fields such as commentaries, analytics, translations, monetization etc.
 #
 #
@@ -126,37 +122,34 @@ def registration_page() -> Union[Response, str]:
         return register()
 
 
+@app.route('/log_in/', methods=['GET', 'POST'])
 def log_in():
     log_in_handler = LogInHandler()
     log_in_handler.log_user()
-    responses = {1: render_template('log_in_page.html', errors='Wrong credentials.'),
-                 2: render_template('log_in_page.html', already_logged_in=True,
-                                    logged_as=session.get('login'),
-                                    name=log_in_handler.login),
-                 3: render_template('log_in_page.html', errors='You did not confirm your email.'),
-                 4: redirect(url_for('personal_page')),
-                 5: redirect('/admin/')}  # defines how the function should act,
+    responses = {1: {'status': 406, 'response': 'Not enough data'},
+                 2: {'status': 409, 'response': 'Already logged in', 'logged_as': session.get('login')},
+                 3: {'status': 412, 'response': 'Email not confirmed'},
+                 4: {'status': 300, 'response': url_for('personal_page')},
+                 5: {'status': 300, 'response': '/admin/'}}  # defines how the function should act,
     # depending on the log_in_handler status.
-    return responses.get(log_in_handler.status.value)
+    current_response = responses.get(log_in_handler.status.value)
+    return current_response
 
 
-@app.route('/log_in_anyways/<login>')
+@app.route('/log_in_anyways/', methods=['POST'])
 @login_required(session)
-def log_in_anyways(login: str) -> Response:
+def log_in_anyways():
     log_in_handler = LogInHandler()
-    log_in_handler.force_log_in(login)
+    log_in_handler.force_log_in()
     if log_in_handler.status.value == 5:
-        return redirect('/admin/')
+        return {'status': 300, 'response': '/admin/'}
     else:
-        return redirect(url_for('personal_page'))
+        return {'status': 300, 'response': url_for('personal_page')}
 
 
 @app.route('/log_in_page', methods=['GET', 'POST'])
 def log_in_page() -> Union[Response, str]:
-    if request.method == 'GET':
-        return render_template('log_in_page.html')
-    else:
-        return log_in()
+    return render_template('log_in_page.html')
 
 
 @app.route('/admin/examine_post/', methods=['GET', 'POST'],
@@ -253,6 +246,14 @@ def check_role() -> None:
     if user.get_role == UserRole.Viewer:
         new_user = UserFactory.create_and_update(user.get_user_id)
         users[user.get_login] = new_user
+
+
+@app.route('/restore_password/', methods=['GET', 'POST'])
+def restore_password():
+    email_address, login = request.json.values()
+    status = RestorePasswordNotificationSender(email_address=email_address,
+                                               login=login).send_email()
+    return status
 
 
 @app.route('/log_out')

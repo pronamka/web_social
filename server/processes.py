@@ -1,12 +1,15 @@
-from typing import Union, Any, Literal, Callable
+from typing import Union, Any, Literal, Callable, Optional
 from enum import Enum
 from datetime import datetime, timedelta
 from json import dumps, JSONEncoder
+from abc import ABC, abstractmethod
 
 from flask import request, render_template, url_for, session
 from flask_login import login_user
 from flask_mail import Mail, Message
+
 from werkzeug.security import generate_password_hash, check_password_hash
+
 from itsdangerous import URLSafeTimedSerializer
 from itsdangerous.exc import BadTimeSignature
 
@@ -91,12 +94,12 @@ class InformationGetter:
                                             self.parameters.get('posts_loaded', 0),
                                             self.parameters.get('of_user', True))),
                           'dated_posts': (self.get_dated_posts,
-                                          (self.parameters.get('dates_loaded', 0), )),
+                                          (self.parameters.get('dates_loaded', 0),)),
                           'latest_comments': (self.get_latest_comments,
-                                           (self.parameters.get('post_id', 0),
-                                            self.parameters.get('comments_required', 1),
-                                            self.parameters.get('comments_loaded', 0),
-                                            self.parameters.get('of_user', True)))}
+                                              (self.parameters.get('post_id', 0),
+                                               self.parameters.get('comments_required', 1),
+                                               self.parameters.get('comments_loaded', 0),
+                                               self.parameters.get('of_user', True)))}
 
     def get_full_data(self) -> dict:
         """Get all the data that was specified
@@ -127,7 +130,7 @@ class InformationGetter:
 
     @staticmethod
     def get_latest_comments(post_id: int, amount: int = 1, start_with: int = 0,
-                         of_user: bool = True) -> tuple[FullyFeaturedPost]:
+                            of_user: bool = True) -> tuple[FullyFeaturedPost]:
         print(post_id, amount, start_with)
         if of_user:
             """May be used later for displaying analytics page."""
@@ -250,23 +253,23 @@ class PostRegistry(BasicManager):
 
 class LogInHandler(Manager):
     """Class for conducting the logging in process"""
-    _actions = {1: UserFactory.create_viewer, 2: UserFactory.create_author, 3: UserFactory.create_admin}
+    _actions = {1: UserFactory.create_viewer,
+                2: UserFactory.create_author, 3: UserFactory.create_admin}
 
     def __init__(self) -> None:
         super(LogInHandler, self).__init__()
         self.status = None
-        self.login = None
+        self.login = request.json.get('login')
 
-    def force_log_in(self, login: str) -> None:
+    def force_log_in(self) -> None:
         """Log in a user without doing any verification.
         Used to re-login user if he already has an active session"""
         users.pop(session.get('login'))
-        self._log_in(login)
-        self.status = LogInState.CredentialsFine
+        session.pop('login')
+        self.log_user()
 
     def log_user(self) -> tuple:
         """General function that launches all the processes of logging in"""
-        self.login = request.form.get('login')
         self._check_properties()
         if self.status.value >= 4:
             self._log_in(self.login)
@@ -326,7 +329,7 @@ class LogInHandler(Manager):
         :returns: True if it matches, False if it does not"""
         return check_password_hash(self.database.get_information(f"SELECT PASSWORD FROM users WHERE "
                                                                  f"login='{self.login}'")[0],
-                                   request.form.get('password'))
+                                   request.json.get('password'))
 
 
 class RegistrationHandler(Manager):
@@ -347,14 +350,14 @@ class RegistrationHandler(Manager):
         """Resend email. If you want to send email to a specific user do not use this function
         as it will send the message to the email address of a RegistrationHandler instance"""
         email_confirmation_handler = EmailConfirmationHandler(self.login, self.email)
-        email_confirmation_handler.send_confirmation_email()
+        email_confirmation_handler.send_email()
 
     def create_new_user(self) -> None:
         """General function that launches all the processes."""
         if self._check_status():
             self._create_in_db()
             email_confirmation_handler = EmailConfirmationHandler(self.login, self.email)
-            email_confirmation_handler.send_confirmation_email()
+            email_confirmation_handler.send_email()
             self.status = RegistrationState.SuccessfullyCreated
 
     def _check_status(self) -> Union[RegistrationState, None]:
@@ -417,28 +420,163 @@ class Token:
         return cls.serializer.dumps(user_id, app.config['SECURITY_PASSWORD_SALT'])
 
     @classmethod
-    def check_token(cls, token: str, expiration=1800) -> bool:
+    def check_token(cls, token: str, expiration=1800) -> [int, bool]:
         """Check if a token is right and has not expired yet."""
         try:
-            user_id_credentials = cls.serializer.loads(token, salt=app.config['SECURITY_PASSWORD_SALT'],
-                                                       max_age=expiration)
-            cls.database.update(f'''UPDATE users SET status="1" WHERE id="{user_id_credentials}"''')
-            return True
+            user_id = cls.serializer.loads(token, salt=app.config['SECURITY_PASSWORD_SALT'],
+                                           max_age=expiration)
+            return user_id
         except BadTimeSignature:
             return False
 
 
+class EmailSenderWithToken(ABC):
+    """Class for sending emails that require token."""
+    database = DataBase()
+
+    def __init__(self, email_address: str):
+        self.email_manager = Mail(app)
+        self.email_address = email_address
+        self.token = Token()
+        self.user_id = self._get_by_email()
+
+    @abstractmethod
+    def send_email(self):
+        """General function for building email message and
+        sending it on the email address given when initializing."""
+
+    @abstractmethod
+    def _create_email(self):
+        """Build the actual email message (usually html)"""
+
+    @abstractmethod
+    def _build_url(self):
+        """Build the url that user should follow to complete whatever
+        action described in child classes."""
+
+    def _get_by_email(self) -> int:
+        """Get user id from login."""
+        return self.database.get_information(f"SELECT id FROM users WHERE email="
+                                             f"'{self.email_address}'", default=(None,))[0]
+
+
+class EmailConfirmationHandler(EmailSenderWithToken):
+    """Class for conducting the process of email confirmation."""
+
+    def __init__(self, login: str, email: str) -> None:
+        super().__init__(email)
+        self.login = login
+
+    @app.route('/send_email/<login>/<email>')
+    def send_email(self) -> str:
+        """Send the email message to it's recipients."""
+        email_message = self._create_email()
+        self.email_manager.send(email_message)
+        return render_template('registration_page.html')
+
+    @staticmethod
+    @app.route('/confirm_email/<token>')
+    def confirm_email(token: str) -> str:
+        """Check the token in the user's email message."""
+        if (user_id := Token.check_token(token)) is False:
+            return 'The link is either wrong or expired.'
+        else:
+            DataBase(access_level=3).update(f'''UPDATE users SET status="1" WHERE id="{user_id}"''')
+            return 'Your account is confirmed, thanks. You can now close this page.'
+
+    def _create_email(self) -> Message:
+        """Build the the actual email message (html)"""
+        verification_message = Message('Confirm your email address', recipients=[self.email_address])
+        verification_message.html = render_template('email_pages/confirmation_letter.html',
+                                                    confirm_url=self._build_url())
+        return verification_message
+
+    def _build_url(self) -> str:
+        """Build a url for a confirm_email() function."""
+        return url_for('confirm_email', token=self.token.create_token(self.user_id), _external=True)
+
+
+class RestorePasswordNotificationSender(EmailSenderWithToken):
+    """Class for sending an email to restore password and
+    actually restoring it."""
+
+    def __init__(self, email_address: Optional[str] = None, login: Optional[str] = None):
+        if login:
+            email_address = self._get_email_by_login(login)
+        super().__init__(email_address)
+
+    def send_email(self) -> dict:
+        """General function to send an email to restore password.
+        Check if the user with given email(or login) exists and
+        if he had confirmed his email address. If both conditions are
+        true, a link, leading to a page for password restoration will
+        be sent to the user's email address."""
+        if not self.user_id:
+            return {'status': 406, 'response': "The login or email you've entered does not exist."}
+        if not self._check_if_email_confirmed():
+            return {'status': 409, 'response': "You did not confirm your email yet."}
+        email_message = self._create_email()
+        self.email_manager.send(email_message)
+        return {'status': 200}
+
+    @staticmethod
+    @app.route('/change_password/', methods=['POST'])
+    def change_password() -> str:
+        """Set user's password to the new one he chooses, if the
+        token in the email sent to the user hasn't expired and if it's valid.
+        Token and password both sent as a body of the request via js fetch()."""
+        password, token = request.json.values()
+        if (user_id := Token.check_token(token)) is False:
+            return 'Ooops... The link is no longer valid.'
+        password = generate_password_hash(password)
+        DataBase(access_level=3).update(f'UPDATE users SET '
+                                        f'password="{password}" WHERE id="{user_id}"')
+        return 'Your password was successfully restored.'
+
+    @staticmethod
+    @app.route('/new_password/<token>')
+    def new_password(token) -> str:
+        """Check if the token in the email sent to the user
+        hasn't expired and if it's valid. If it is, a template
+        for restoring a password will be rendered."""
+        if Token.check_token(token) is False:
+            return 'The link is either wrong or expired.'
+        else:
+            return render_template('email_pages/restore_password_letter.html', token=token)
+
+    def _create_email(self) -> Message:
+        """Construct the email for restring password."""
+        verification_message = Message('Restore your password', recipients=[self.email_address])
+        verification_message.html = '<a href="' + self._build_url() + '">' + self._build_url() + '</a>'
+        return verification_message
+
+    def _build_url(self) -> str:
+        """Build a url leading to a new_password() function."""
+        return url_for('new_password', token=self.token.create_token(self.user_id), _external=True)
+
+    def _get_email_by_login(self, login: str) -> Union[str, None]:
+        """Get user's email from given login."""
+        return self.database.get_information(f'SELECT email FROM users WHERE login="{login}"',
+                                             default=(None,))[0]
+
+    def _check_if_email_confirmed(self) -> Union[tuple, False]:
+        return self.database.get_information(f'SELECT email FROM users WHERE email="'
+                                             f'{self.email_address}" AND status="1"', False)
+
+
 class EmailBanMessageSender:
-
+    """Class for sending notifications about banning
+    user's post. It is not a subclass of EmailSenderWithToken,
+    as it doesn't require one."""
     standard_message = 'Dear {}, \n' \
-               'This message is sent to you by PronScience to ' \
-               'inform you that one of your posts - "{}" ' \
-               'was banned for the following reason: "{}". \n' \
-               'If you have any questions or complains, please contact the ' \
-               'member of our post-checking crew on the platform or ' \
-               'at {}.'
+                       'This message is sent to you by PronScience to ' \
+                       'inform you that one of your posts - "{}" ' \
+                       'was banned for the following reason: "{}". \n' \
+                       'If you have any questions or complains, please contact the ' \
+                       'member of our post-checking crew on the platform or ' \
+                       'at {}.'
 
-    def __init__(self, post_id: int, problem_description: str):
+    def __init__(self, post_id: int, problem_description: str) -> None:
         self.mail = Mail(app)
         self.problem_description = problem_description
         self.current_admin = UserFactory().create_admin(1)
@@ -446,14 +584,17 @@ class EmailBanMessageSender:
         self.user_data = self._get_user_data(self.current_post.get_author)
 
     def send_ban_notification(self) -> None:
+        """General function for construction and sending an email message."""
         self._update_post_status()
         self.mail.send(self._build_message())
 
-    def _update_post_status(self):
+    def _update_post_status(self) -> None:
+        """Set post status from 0(or from 1, but unlikely) to 2(banned)."""
         DataBase(access_level=3).update(f'UPDATE posts SET '
                                         f'verified=2 WHERE post_id="{self.current_post.get_id}"')
 
-    def _build_message(self):
+    def _build_message(self) -> Message:
+        """Construct the email message."""
         message = Message(f'Post "{self.current_post.get_title}" was banned.',
                           recipients=[self.user_data[1]],
                           sender=('PronScience', 'defender0508@gmail.com'))
@@ -464,49 +605,7 @@ class EmailBanMessageSender:
 
     @staticmethod
     def _get_user_data(login: str) -> tuple[str, str]:
-        return login, \
-               DataBase().get_information(f'SELECT email FROM users WHERE login="{login}"')[0]
-
-
-class EmailConfirmationHandler(Manager):
-    """Class for conducting the process of email confirmation."""
-
-    def __init__(self, login: str, email: str) -> None:
-        super().__init__()
-        self.email_manager = Mail(app)
-        self.login = login
-        self.email = email
-        self.user_id = self._get_by_login()
-        self.token = Token()
-
-    @app.route('/send_email/<login>/<email>')
-    def send_confirmation_email(self) -> str:
-        """Send the email message to it's recipients."""
-        email_message = self._create_email()
-        self.email_manager.send(email_message)
-        return render_template('registration_page.html')
-
-    @staticmethod
-    @app.route('/confirm_email/<token>')
-    def confirm_email(token: str) -> str:
-        """Check the token in the user's email message."""
-        status = Token.check_token(token)
-        if status is not True:
-            return 'The link is either wrong or expired.'
-        else:
-            return 'Your account is confirmed, thanks. You can now close this page.'
-
-    def _create_email(self) -> Message:
-        """Build the the actual email message (html)"""
-        verification_message = Message('Confirm your email address', recipients=[self.email])
-        verification_message.html = render_template('email_pages/confirmation_letter.html',
-                                                    confirm_url=self._build_confirmation_url())
-        return verification_message
-
-    def _build_confirmation_url(self) -> str:
-        """Build a url for a confirm_email() function."""
-        return url_for('confirm_email', token=self.token.create_token(self.user_id), _external=True)
-
-    def _get_by_login(self) -> int:
-        """Get user id from login."""
-        return self.database.get_information(f"SELECT id FROM users WHERE login='{self.login}'")[0]
+        """Look for the user's email in database using
+        given login."""
+        return login, DataBase().get_information(f'SELECT email FROM '
+                                                 f'users WHERE login="{login}"', (None,))[0]
