@@ -94,9 +94,9 @@ def convert_image(name: str) -> None:
         jpeg.save(f'../static/avatar_images/{name.split(".")[0]}.jpeg')  # save the the representation as jpeg
 
 
-class UsersObserver(Manager):
+class UsersObserver:
     """Class for tracking users' conditions."""
-
+    database = DataBase(access_level=4)
     def __init__(self):
         super().__init__()
 
