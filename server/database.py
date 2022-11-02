@@ -1,6 +1,6 @@
 from sqlite3 import connect, Error as db_Error
 from enum import Enum
-from typing import Callable, Union
+from typing import Callable, Union, Any
 
 
 class NoPermission(PermissionError):
@@ -127,9 +127,13 @@ class DataBase:
         self.access = AccessLevel(access_level)
 
     @safe_execution
-    def get_information(self, sql: str, *args) -> tuple:
+    def get_information(self, sql: str, *args) -> Union[tuple, Any, None]:
         """Returns a tuple containing one element"""
-        return self.cursor.execute(sql).fetchone()
+        if result := self.cursor.execute(sql).fetchone():
+            print(result)
+            return result
+        else:
+            return args[0].get('default', None)
 
     @safe_execution
     def get_many(self, sql: str, *args) -> list:
