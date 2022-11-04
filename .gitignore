@@ -23,6 +23,7 @@ parts/
 sdist/
 var/
 output/
+/images
 *.egg-info/
 .installed.cfg
 *.egg
