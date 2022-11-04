@@ -1,0 +1,83 @@
+{% extends 'personal_pages/base.html' %}
+{% block title %}<p id="page_title"></p>{% endblock %}
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
+<meta name="viewport" content="width=device-width">
+<main role="main">
+    <article>
+        <div id="search_results"></div>
+    </article>
+</main>
+<script>
+    
+    var search_query = '{{search_query}}'
+    console.log(search_query)
+    document.addEventListener('DOMContentLoaded', display_first_results())
+
+    function sendRequest(method, url, body) {
+        const headers = {'Content-Type': 'application/json'}
+        console.log(body)
+        return fetch(url, {
+            method: method,
+            body: JSON.stringify(body),
+            headers: headers}).then(response => {
+            return response.text()
+        })
+    }
+    
+    function display_first_results(){
+        sendRequest('POST', '/search/', {'query': search_query}).then(resp=>{
+            console.log(resp)
+            var posts=JSON.parse(resp)
+            console.log(posts)
+            buildPosts(posts)
+        })
+    }
+        
+    function buildPosts(post_dict){
+        for (var i=0, l=Object.keys(post_dict).length; i<=l; i++){
+            try{
+                title = post_dict[i]['title'];
+                author = post_dict[i]['author'];
+                post_id = post_dict[i]['post_id'];
+                creation_date = post_dict[i]['display_date']
+                path = '/static/upload_folder/'+title;
+                post = buildHTML(path, author, title, post_id, creation_date);
+                addPost(post);
+            }
+            catch(error){
+                if (error != "TypeError: Cannot read properties of undefined (reading 'comment_registry')"){
+                    console.log('An error has occured:'+error)
+                }
+                else {
+                    comments = 'No comments yet.'
+                }
+            }
+        }
+    }
+
+    function buildHTML(path, author, title, post_id, creation_date){
+        html = `<div class="table_cell" id="`+post_id+`">
+                    <iframe width="900" height="1075" src="`+ path+`"></iframe>
+                    <details class="post_data" open>
+                        <summary>`+title+`</summary>
+                        <ul>
+                            <li>`+author+`</li>
+                            <li>`+post_id+`</li>
+                            <li>`+creation_date+`</li>
+                        </ul>
+                    </details>
+                </div>`;
+        return html
+    }
+
+    function addPost(html) {
+        const tab = document.getElementById('search_results');
+        var template = document.createElement('template');
+        html = html.trim(); // Never return a text node of whitespace as the result
+        template.innerHTML = html;
+        tab.appendChild(template.content);
+        return template.content.firstChild;
+    }
+</script>
+{% endblock %}
