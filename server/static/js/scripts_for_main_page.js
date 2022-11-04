@@ -64,11 +64,13 @@ function addPost(html) {
     return template.content.firstChild;
 }
 
-current_position = 250
+
+current_position = 380
 window.addEventListener("scroll", function(event) {
     var top = this.scrollY
+    console.log(top, current_position)
     if (current_position < top){
-        current_position += 1000
+        current_position += 620
         getPosts();
     } 
 }, false);
