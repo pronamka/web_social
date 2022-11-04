@@ -7,14 +7,12 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 from docx2pdf import convert as convert_to_pdf
 
-from server.managers import Manager
 from server.database import DataBase
 
 allowed_extensions = ('txt', 'jpg', 'docx', 'jpeg', 'png', 'pdf', 'xlsx', 'jpeg')
 
 
 class ExtensionNotAllowed(PermissionError):
-    __slots__ = 'message'
 
     def __init__(self, filename: str) -> None:
         self.message = f'File with filename {filename} has an unexpected file extension.'
@@ -24,7 +22,6 @@ class ExtensionNotAllowed(PermissionError):
 
 
 class SymbolsNotAllowed(OSError):
-    __slots__ = 'message'
 
     def __init__(self, filename: str, symbol: str) -> None:
         self.message = f'File with filename {filename} has unexpected symbols in it.' \
@@ -35,14 +32,13 @@ class SymbolsNotAllowed(OSError):
 
 
 class FileManager:
-    __slots__ = 'file', 'user_id', 'filename', 'protocols'
     upload_path = 'static/upload_folder/'
 
     def __init__(self, file, user_id: int) -> None:
         self.file = file
         self.user_id = user_id
-        self.filename = self.security_check()
-        self.protocols = {'pdf': self.immediate_save, 'docx': self.save_as_pdf}
+        self.filename = self._security_check()
+        self.protocols = {'pdf': self._immediate_save, 'docx': self._save_as_pdf}
 
     def save(self):
         date = datetime.now()
@@ -53,15 +49,15 @@ class FileManager:
                                               date.strftime('%Y-%m-%d'),
                                               date.strftime("%A, %d. %B %Y %H:%M")))
         # noinspection PyArgumentList
-        self.protocols.get(self.get_extension())(self.file)
+        self.protocols.get(self._get_extension())(self.file)
 
-    def get_extension(self) -> str:
+    def _get_extension(self) -> str:
         return self.filename.rsplit('.', 1)[1]
 
-    def immediate_save(self, file):
+    def _immediate_save(self, file):
         file.save(os.path.join(self.upload_path, self.filename))
 
-    def save_as_pdf(self, file):
+    def _save_as_pdf(self, file):
         file.save(os.path.join(self.upload_path, self.filename))
         self._convert_and_save()
         os.remove(f'static/upload_folder/{self.filename}')
@@ -71,7 +67,7 @@ class FileManager:
         convert_to_pdf(os.path.join(self.upload_path, self.filename),
                        os.path.join(self.upload_path, str(self.filename.rsplit('.', 1)[0] + '.pdf')))
 
-    def security_check(self) -> str:
+    def _security_check(self) -> str:
         filename = self.file.filename
         chars = list(map(ord, filename))
         for i in chars:
@@ -97,6 +93,7 @@ def convert_image(name: str) -> None:
 class UsersObserver:
     """Class for tracking users' conditions."""
     database = DataBase(access_level=4)
+
     def __init__(self):
         super().__init__()
 
