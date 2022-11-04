@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Union, Generator
 import os
 
 from server.database import DataBase
@@ -243,6 +243,11 @@ class UserPostRegistry(PostRegistry):
                                             f'AND date="{date}"')
         posts = [PostForDisplay(post_id) for post_id in data]
         return posts
+
+    @classmethod
+    def get_posts_from_ids(cls, post_ids: list,
+                           post_type: Union[PostForDisplay, FullyFeaturedPost]=PostForDisplay):
+        return [post_type(i) for i in post_ids]
 
 
 class AdminPostRegistry(PostRegistry):

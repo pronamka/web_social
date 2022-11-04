@@ -3,8 +3,9 @@ from enum import Enum
 from datetime import datetime, timedelta
 from json import dumps, JSONEncoder
 from abc import ABC, abstractmethod
+from functools import wraps
 
-from flask import request, render_template, url_for, session
+from flask import request, render_template, url_for, session, abort
 from flask_login import login_user
 from flask_mail import Mail, Message
 
@@ -19,15 +20,55 @@ from server.posts import PostForDisplay, AdminPostRegistry, UserPostRegistry, \
     FullyFeaturedPost, CommentsRegistry
 from server.user import UserFactory, Viewer, Author, Admin, UserRole
 from server.managers import Manager, BasicManager
+from server.search_engine import search_post
 
 
-def get_user() -> [Viewer, Author, Admin]:
+def login_required(current_session):
+
+    """
+    If you decorate a view with this, it will ensure that the current user is
+    logged in and authenticated before calling the actual view.
+    Note: this method is taken from flask-login library and slightly re-written
+    to fit the system. Do not import this function from flask-login to avoid errors."""
+    def decorated_view(function: Callable):
+        @wraps(function)
+        def fixed_decorated_view(*args, **kwargs):
+            if request.method in {"OPTIONS"} or app.config.get("LOGIN_DISABLED"):
+                pass
+            elif not current_session.get('login'):
+                return app.login_manager.unauthorized()
+
+            # flask 1.x compatibility
+            # current_app.ensure_sync is only available in Flask >= 2.0
+            if callable(getattr(app, "ensure_sync", None)):
+                return app.ensure_sync(function)(*args, **kwargs)
+            return function(*args, **kwargs)
+        return fixed_decorated_view
+    return decorated_view
+
+
+def admin_required(func: Callable):
+    @wraps(func)
+    def wrapper():
+        if get_user().get_role == UserRole.Admin:
+            try:
+                return func()
+            except AssertionError as e:
+                return {'status': f'{e.__class__.__name__}: {e}'}
+        else:
+            return abort(418)
+    return wrapper
+
+
+def get_user() -> Union[Viewer, Author, Admin]:
     """Get the user object that corresponds with the client machine."""
     return users.get(session.get('login'))
 
 
-def verify_post(post_id: int) -> None:
-    DataBase(access_level=3).update(f'UPDATE posts SET verified=1 WHERE post_id="{post_id}"')
+def search_for(query: str, required_amount: int = 5, start_with=0):
+    post_ids = [i.get('post_id') for i in search_post(query, limit=required_amount)]
+    res = UserPostRegistry.get_posts_from_ids(post_ids)
+    return dumps(res, cls=Encoder)
 
 
 def write_comment(post_id: str, comment_text: str) -> None:
@@ -76,11 +117,11 @@ class InformationGetter:
     def __init__(self, properties: dict, **kwargs):
         """Initialize InformationGetter.
         :param properties: dictionary with all
-            typed of information needed.
+            the information about what data is required.
         :param kwargs: dictionary with some special
             information for loading exact values
             (e.g. how many posts were already loaded
-            and which too load now etc.) Not always required."""
+            and which too load now etc.). Not always required."""
         self.properties = properties
         self.parameters = kwargs.get('parameters')
         self.user = get_user()
@@ -131,7 +172,6 @@ class InformationGetter:
     @staticmethod
     def get_latest_comments(post_id: int, amount: int = 1, start_with: int = 0,
                             of_user: bool = True) -> tuple[FullyFeaturedPost]:
-        print(post_id, amount, start_with)
         if of_user:
             """May be used later for displaying analytics page."""
             ...
@@ -139,8 +179,10 @@ class InformationGetter:
             return CommentsRegistry(post_id).get_latest_comments(amount, start_with)
 
     def get_latest_posts(self, amount: int = 1, start_with: int = 0,
-                         of_user: bool = True) -> tuple[FullyFeaturedPost]:
-        if of_user:
+                         of_user: bool = True) -> Union[int, tuple[FullyFeaturedPost]]:
+        if of_user and self.user.get_role == UserRole.Viewer:
+            return 0
+        elif of_user:
             return self.user.PostManager.get_latest_posts(amount, start_with)
         else:
             return UserPostRegistry.get_posts(amount, start_with)
@@ -177,10 +219,6 @@ class PostLoader:
     The methods overlap each other, so our crew is developing
     a method to combine them."""
 
-    # those methods are not safe because they can be called
-    # by any user, to get info it they are not supposed to get
-    # some kind of verification or password/token system should be implemented
-
     @staticmethod
     @app.route('/load_info/', methods=['GET', 'POST'])
     def load_info():
@@ -202,10 +240,8 @@ class PostLoader:
 
     @staticmethod
     @app.route('/admin_get_posts', methods=['GET', 'POST'])
+    @admin_required
     def admin_get_posts() -> str:
-        # the js on the client side calls this when posts need to be loaded
-        # for admin.
-        # post verification system should be implemented
         data = {}
         posts_loaded, posts_required = request.json.values()
         for i in enumerate(AdminPostRegistry.get_posts(posts_required, posts_loaded)):
@@ -559,53 +595,7 @@ class RestorePasswordNotificationSender(EmailSenderWithToken):
         return self.database.get_information(f'SELECT email FROM users WHERE login="{login}"',
                                              default=(None,))[0]
 
-    def _check_if_email_confirmed(self) -> Union[tuple, False]:
+    def _check_if_email_confirmed(self) -> Union[tuple, bool]:
         return self.database.get_information(f'SELECT email FROM users WHERE email="'
                                              f'{self.email_address}" AND status="1"', False)
 
-
-class EmailBanMessageSender:
-    """Class for sending notifications about banning
-    user's post. It is not a subclass of EmailSenderWithToken,
-    as it doesn't require one."""
-    standard_message = 'Dear {}, \n' \
-                       'This message is sent to you by PronScience to ' \
-                       'inform you that one of your posts - "{}" ' \
-                       'was banned for the following reason: "{}". \n' \
-                       'If you have any questions or complains, please contact the ' \
-                       'member of our post-checking crew on the platform or ' \
-                       'at {}.'
-
-    def __init__(self, post_id: int, problem_description: str) -> None:
-        self.mail = Mail(app)
-        self.problem_description = problem_description
-        self.current_admin = UserFactory().create_admin(1)
-        self.current_post = FullyFeaturedPost(post_id)
-        self.user_data = self._get_user_data(self.current_post.get_author)
-
-    def send_ban_notification(self) -> None:
-        """General function for construction and sending an email message."""
-        self._update_post_status()
-        self.mail.send(self._build_message())
-
-    def _update_post_status(self) -> None:
-        """Set post status from 0(or from 1, but unlikely) to 2(banned)."""
-        DataBase(access_level=3).update(f'UPDATE posts SET '
-                                        f'verified=2 WHERE post_id="{self.current_post.get_id}"')
-
-    def _build_message(self) -> Message:
-        """Construct the email message."""
-        message = Message(f'Post "{self.current_post.get_title}" was banned.',
-                          recipients=[self.user_data[1]],
-                          sender=('PronScience', 'defender0508@gmail.com'))
-        body = self.standard_message.format(self.user_data[0], self.current_post.get_title,
-                                            self.problem_description, self.current_admin.get_email)
-        message.html = body
-        return message
-
-    @staticmethod
-    def _get_user_data(login: str) -> tuple[str, str]:
-        """Look for the user's email in database using
-        given login."""
-        return login, DataBase().get_information(f'SELECT email FROM '
-                                                 f'users WHERE login="{login}"', (None,))[0]

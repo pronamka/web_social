@@ -1,17 +1,17 @@
-from typing import Union, Callable
+from typing import Union
 from threading import Thread
-from functools import wraps
 
-from flask import render_template, request, url_for, redirect, Response, abort
+from flask import render_template, request, url_for, redirect, Response, session
 from flask_login import logout_user
-from flask import session
 
 from server.app_core import app, login_manager, users
-from server.processes import RegistrationHandler, LogInHandler, EmailBanMessageSender, \
-    get_user, verify_post, write_comment, RestorePasswordNotificationSender
+from server.processes import RegistrationHandler, LogInHandler, RestorePasswordNotificationSender, \
+    get_user, write_comment, admin_required, login_required, Encoder
 from server.utils import UsersObserver, FileManager
 from server.posts import FullyFeaturedPost
 from server.user import UserFactory, UserRole
+from server.processes import search_for
+
 
 # Things that need fixing:
 #   1)User can have two personal page at once by just copy-pasting the link of his page
@@ -48,43 +48,6 @@ from server.user import UserFactory, UserRole
 
 temp = {}  # a very bad solution, should solve this resend email problem somehow else
 Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
-
-
-def login_required(current_session):
-
-    """
-    If you decorate a view with this, it will ensure that the current user is
-    logged in and authenticated before calling the actual view.
-    Note: this method is taken from flask-login library and slightly re-written
-    to fit the system. Do not import this function from flask-login to avoid errors."""
-    def decorated_view(function):
-        @wraps(function)
-        def fixed_decorated_view(*args, **kwargs):
-            if request.method in {"OPTIONS"} or app.config.get("LOGIN_DISABLED"):
-                pass
-            elif not current_session.get('login'):
-                return app.login_manager.unauthorized()
-
-            # flask 1.x compatibility
-            # current_app.ensure_sync is only available in Flask >= 2.0
-            if callable(getattr(app, "ensure_sync", None)):
-                return app.ensure_sync(function)(*args, **kwargs)
-            return function(*args, **kwargs)
-        return fixed_decorated_view
-    return decorated_view
-
-
-def admin_required(func: Callable):
-    @wraps(func)
-    def wrapper():
-        if get_user().get_role == UserRole.Admin:
-            try:
-                return func()
-            except AssertionError as e:
-                return {'status': f'{e.__class__.__name__}: {e}'}
-        else:
-            return abort(418)
-    return wrapper
 
 
 def register() -> Union[Response, str]:
@@ -166,14 +129,13 @@ def examine_post():
 def admin_ban_post():
     post_id, problem_description = request.json.values()
     assert problem_description, 'You did not provide problem description.'
-    EmailBanMessageSender(post_id, problem_description).send_ban_notification()
+    get_user().ban_post(post_id, problem_description, app)
     return {'status': 'successful'}
 
 
 @app.route('/admin/verify_post/', methods=['GET', 'POST'], endpoint='admin_verify_post')
 def admin_verify_post():
-    post_id: int = request.json
-    verify_post(post_id)
+    get_user().verify_post(*request.json.values())
     return {'status': 'successful'}
 
 
@@ -254,6 +216,20 @@ def restore_password():
     status = RestorePasswordNotificationSender(email_address=email_address,
                                                login=login).send_email()
     return status
+
+
+@app.route('/search/', methods=['GET', 'POST'])
+def search():
+    query = request.json.get('query')
+    data = search_for(query)
+    return data
+
+
+@app.route('/search_page/', methods=['GET', 'POST'])
+def search_page():
+    query = request.args.to_dict().get('query')
+    return render_template('personal_pages/search_results_page.html',
+                           search_query=query)
 
 
 @app.route('/log_out')
