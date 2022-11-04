@@ -1,6 +1,9 @@
 body{
 	background-image: url(../backgrounds/background_for_prototype.jpg);
 }
+#search_query{
+    margin-left: 50%;
+}
 @font-face {
   font-family: "centurygothic";
   font-style: normal;
