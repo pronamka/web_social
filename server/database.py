@@ -120,7 +120,7 @@ def check_request(func: Callable, request: str, access_level: AccessLevel):
 class DataBase:
     """Class for safely interacting with database."""
 
-    def __init__(self, database_name: str = 'web_social_v2.db', access_level: int = 1) -> None:
+    def __init__(self, database_name: str = 'web_social_v3.db', access_level: int = 1) -> None:
         """Establishing database connection and creating a cursor object"""
         self.connection = connect(database_name, check_same_thread=False)
         self.cursor = self.connection.cursor()
@@ -130,7 +130,6 @@ class DataBase:
     def get_information(self, sql: str, *args) -> Union[tuple, Any, None]:
         """Returns a tuple containing one element"""
         if result := self.cursor.execute(sql).fetchone():
-            print(result)
             return result
         else:
             return args[0].get('default', None)
