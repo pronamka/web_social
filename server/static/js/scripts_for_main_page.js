@@ -47,7 +47,7 @@ function buildHTML(path, author, title, post_id){
             <iframe width="300" height="500" class="preview" src="`+ path+`"></iframe>
             <div class="for_preview">
                 <p class="post_name">
-                <a href="/view_post/?post_id=`+post_id+`">`+ title+`</a>
+                <a href="/view_post/?post_id=${post_id}" id="post ${post_id}">`+ title+`</a>
                 </p><br><p class="person_name">by `+ author+`</p>
             </div>
             </object>`
