@@ -65,25 +65,21 @@ operations_access_required = {'get_information': AccessLevel(1),
                               'update': AccessLevel(3),
                               'delete': AccessLevel(4)}
 
-operations_keywords = {AccessLevel(1): ['SELECT', 'COUNT'],
-                       AccessLevel(2): ['CREATE'],
-                       AccessLevel(3): ['UPDATE'],
-                       AccessLevel(4): ['DELETE'],
-                       'forbidden': ['DROP']}
-
-operations_rev = {AccessLevel(1): ['CREATE', 'UPDATE', 'DELETE', 'DROP', 'PRAGMA'],
-                  AccessLevel(2): ['UPDATE', 'DELETE', 'DROP', 'PRAGMA'],
-                  AccessLevel(3): ['DELETE', 'DROP', 'PRAGMA'],
-                  AccessLevel(4): ['DROP', 'PRAGMA', '']}
+# it would be much either to describe what actions a certain access level is
+# allowed to do rather than writing the permission level for every operation,
+# but I think I might use some commands in the future,
+# and this system is a little either to modify
 
 commands_dict = {'SELECT': AccessLevel(1),
                  'COUNT': AccessLevel(1),
                  'INSERT': AccessLevel(2),
                  'UPDATE': AccessLevel(3),
                  'DELETE': AccessLevel(4),
-                 'CREATE': False,
-                 'DROP': False,
-                 'PRAGMA': False}
+                 'CREATE': False, 'DROP': False, 'PRAGMA': False, 'ALTER': False, 'ANALYZE': False,
+                 'COMMIT': False, 'DETACH': False, 'END': False, 'EXPLAIN': False,
+                 'INDEXED BY': False, 'ON CONFLICT': False, 'REINDEX': False, 'RELEASE': False,
+                 'REPLACE': False, 'RETURNING': False, 'ROLLBACK': False, 'SAVEPOINT': False,
+                 'UPSERT': False, 'VACUUM': False, 'WITH': False}
 
 
 def safe_execution(func: Callable) -> Union[AssertionError, Callable]:
@@ -97,7 +93,8 @@ def safe_execution(func: Callable) -> Union[AssertionError, Callable]:
             sql = args[1]
             check_request(func, sql, access_level)
             try:
-                return func(args[0], sql, kwargs)
+                res = func(args[0], sql, kwargs)
+                return res
             except TypeError as error:
                 raise InternalError(func, (args, kwargs), error)
             except db_Error as error:
