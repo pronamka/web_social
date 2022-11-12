@@ -1,25 +1,36 @@
 const nav_tabs = document.querySelectorAll('[data-tab-value]');
 const tabs_content = document.querySelectorAll('[data-tab-info]');
-const action_protocols = {'hub': {'/inf_for_hub': null}, 
+const action_protocols = {'hub': {'call': loadHub, 'called': 1}, 
                         'content': {'call': loadContentPage, 'called': 0}, 
-                        'analitics': {'/analitics': null},
-                        'commentaries': {'/commentaries': 0}, 
+                        'analitics': {'call': loadContentPage, 'called': 0},
+                        'commentaries': {'call': loadCommentsPage, 'called': 0}, 
                         'translations': {'/trananslations': 0},
                         };
 const content_page = {'page': 'content', 'posts_loaded': 0, 'posts_required': 2, 'post_type': 'FullyFeaturedPost'}
+const comments_page = {'page': 'comment_section', 'comments_loaded': 0, 'comments_required': 10}
 const btn_upload_files = document.querySelector('btn-upload-files');
 
 document.addEventListener('DOMContentLoaded', loadHub());
 
 
-function sendRequest(method, url, body) {
+function sendRequest(method, url, body, multipart=false) {
     const headers = {'Content-Type': 'application/json'}
-    return fetch(url, {
-        method: method,
-        body: JSON.stringify(body),
-        headers: headers}).then(response => {
-        return response.text();
-    })
+    if (multipart == true){
+        return fetch(url, {
+            method: method,
+            headers: headers,
+            body: body}).then(response => {
+            return response.text();
+        })
+    }
+    else{
+        return fetch(url, {
+            method: method,
+            body: JSON.stringify(body),
+            headers: headers}).then(response => {
+            return response.text();
+        })
+    }
 }
 
 function loadHub(){
@@ -55,6 +66,7 @@ function loadHub(){
         insertHTML('#short_analitics', html);
     })
 }
+
 function loadContentPage(){
     sendRequest('POST', '/load_info/', content_page).then(resp => {
         content = JSON.parse(resp)
@@ -62,6 +74,76 @@ function loadContentPage(){
         buildPosts(content['latest_posts'])
     })
 }
+
+function loadCommentsPage(){
+    sendRequest('POST', '/load_info/', comments_page).then(resp=>{
+        console.log(resp)
+        comments = JSON.parse(resp)
+        console.log(comments)
+        comments_page['comments_loaded'] += comments_page['comments_required']
+        insertHTML('#latest_comments_table', buildComments(comments['latest_comments_dev']))
+    })
+}
+
+class Comment{
+    constructor(comment_info){
+        this.comment_id_val = comment_info['comment_id']
+        this.author_val = comment_info['author']
+        this.date_val = comment_info['date']
+        this.text_val = comment_info['text']
+        this.post_id_val = comment_info['post_id']
+    }
+    get comment_id(){
+        return this.comment_id_val
+    }
+    get author(){
+        return this.author_val
+    }
+    get date(){
+        return this.date_val
+    }
+    get text(){
+        return this.text_val
+    }
+    get post_id(){
+        return this.post_id_val
+    }
+
+}
+function buildComments(comments_array){
+    comments = '';
+    if (comments_array.length == 0){
+        return 'No comments.'
+    }
+    for (var i=0, l=Object.keys(comments_array).length-1; i<=l; i++){
+        const comment = new Comment(comments_array[i])
+        console.log(comment)
+        var cur_id = comment.comment_id
+        comments += `<tr>
+        <td id="author ${cur_id}">${comment.author}</td>
+        <td id="date ${cur_id}">${comment.date}</td>
+        <td id="text ${cur_id}">${comment.text}</td>
+        <td id="post_id ${cur_id}">${comment.post_id}</td>
+        <td id="reply ${cur_id}"><button onclick="reply([`+comment.comment_id+`, '`+comment.author+`', '`+comment.text+`', `+comment.post_id+`])">Reply</button></td>
+        </tr>`
+    }
+    return comments
+}
+function reply(comment){
+    var reply_dialog = document.querySelector('#reply_dialog')
+    reply_dialog.innerHTML = `<h2>Reply to<h2>
+    <p>${comment[1]}'s comment</p>
+    <p>${comment[2]}<p>
+        <input type="text" placeholder="Your reply" id="inp-comment-reply ${comment[0]}">
+        <button placeholder="Reply" onclick="sendReply([`+comment[0]+`, '`+comment[1]+`', '`+comment[2]+`', `+comment[3]+`])"></button>`
+    reply_dialog.showModal()
+}
+
+function sendReply(comment){
+    sendRequest('POST', '/comment/', {'post_id': comment[3] ,
+    'reply_text': comment[2], 'is_reply': comment[0]})
+}
+
 current_position = 250
 window.addEventListener("scroll", function(event) {
     var top = this.scrollY
@@ -110,24 +192,17 @@ class Post{
 }
 
 function buildPosts(post_dict){
-    for (var i=0, l=Object.keys(post_dict).length; i<=l; i++){
+    for (var i=0, l=Object.keys(post_dict).length-1; i<=l; i++){
         var current_post = new Post(post_dict[i])
         current_post.allValues;
-        if (current_post.comments == ''){
-            print('in');
-            comments = '<ul><li>No comments yet</li></ul>';
-        }
-        else{
-            comments = buildComments(current_post.comments);
-        }
         title = current_post.title;
         author = current_post.author_login;
         path = '/static/upload_folder/'+title;
-        post = buildHTML(path, author, title, comments);
+        post = buildHTML(path, author, title);
         addPost(post);
         }
     }
-function buildHTML(path, author, title, comments){
+function buildHTML(path, author, title){
     html = `<div class="table_cell">
             <iframe width="400" height="500" src="`+ path+`"></iframe>
             <details class="post_data" open>
@@ -135,27 +210,10 @@ function buildHTML(path, author, title, comments){
                 <ul>
                 <li>Title: `+title+`</li>
                 <li>Author: `+author+`</li>
-                <li><details>
-                    <summary>Comment Registry</summary>`+comments+
-                `</details></li>
                 </ul>
             </details>
         </div>`;
     return html
-}
-
-function buildComments(comment_section){
-    comments = '';
-    for (var j=1, ln=Object.keys(comment_section).length; j<=ln; j++){
-        if (Object.keys(comment_section).length > 0){
-            comments = comments +  `<ul><details>
-                <summary>Comment id: `+comment_section[j]['comment_id']+`</summary>
-                <li class="comment_info">Comment author: `+comment_section[j]['author']+`</li>
-                <li class="comment_info">Comment text: `+comment_section[j]['text']+`</li>
-            </details></ul>`
-        }
-    }
-    return comments
 }
 
 function addPost(html) {
@@ -180,6 +238,18 @@ function showUploadDialog () {
     upload_dialog.showModal()
 }
 
+function uploadArticle(){
+    const file_data = document.getElementById('inp-file-content').files[0]
+    const file_article = new FormData()
+    file_article.append('file', file_data)
+    file_article.append('filename', file_data['name'])
+    fetch('/upload_file/', {method: 'POST', body: file_article, 
+    headers: {'Accept': 'application/json'}}).then(response=>response.text()).then(resp=>{
+        console.log(resp)
+        alert(resp)
+    })
+}
+
 nav_tabs.forEach(tab => {
     tab.addEventListener('click', () => {
         const direction = document.querySelector(tab.dataset.tabValue);
@@ -187,6 +257,7 @@ nav_tabs.forEach(tab => {
             tabInfo.classList.remove('active');
         })
         const a = direction['id']
+        console.log()
         if (action_protocols[a]['called'] == 0){
             action_protocols[a]['call']()
         }
