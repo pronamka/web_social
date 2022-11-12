@@ -1,9 +1,12 @@
+import os
 from enum import Enum
 from abc import ABC, abstractmethod
+from typing import Union
+
 from flask_login import UserMixin
 from flask_mail import Mail, Message
-from server.search_engine import add_article_to_search, remove_article_from_search
-from os.path import exists
+
+from server.search_engine import add_article_to_search
 from server.managers import UserSubscriptionManager, UserPostManager
 from server.database import DataBase
 
@@ -18,15 +21,15 @@ class UserRole(Enum):
 
 class User(UserMixin, ABC):
     """Basic representation of a user.
-    :param list data: a list of 6 values"""
+    :param data: a tuple of 5 (id, login, email_address, registration_date, status)"""
 
-    def __init__(self, data: list) -> None:
+    def __init__(self, data: tuple) -> None:
         self.user_id, self.login, self.email_address, self.register_date, self.status = data
         self.SubscriptionManager = UserSubscriptionManager(self.user_id)
         self.avatar = self._get_avatar()
 
     def _get_avatar(self):
-        return path if exists((path := f'static/avatar_images/{self.user_id}.jpeg')) \
+        return path if os.path.exists((path := f'static/avatar_images/{self.user_id}.jpeg')) \
             else 'static/avatar_images/0.jpeg'
 
     @property
@@ -72,7 +75,7 @@ class User(UserMixin, ABC):
 
 
 class Viewer(User):
-    def __init__(self, data: list) -> None:
+    def __init__(self, data: tuple) -> None:
         super().__init__(data)
 
     @property
@@ -81,7 +84,7 @@ class Viewer(User):
 
 
 class Author(User):
-    def __init__(self, data):
+    def __init__(self, data: tuple):
         super().__init__(data)
         self.PostManager = UserPostManager(self.user_id)
 
@@ -91,17 +94,25 @@ class Author(User):
 
 
 class Admin(User):
-    def __init__(self, data):
+    def __init__(self, data: tuple):
         super().__init__(data)
         self.PostManager = UserPostManager(self.user_id)
 
-    def verify_post(self, post_id: int, post_title: str) -> None:
+    @staticmethod
+    def verify_post(post_id: int, post_title: str) -> None:
         DataBase(access_level=3).update(f'UPDATE posts SET verified=1 WHERE post_id="{post_id}"')
         add_article_to_search(post_title, post_id)
 
     def ban_post(self, post_id, problem_description, current_app):
-        EmailBanMessageSender(post_id, problem_description, self.login, current_app)
-        remove_article_from_search(post_id)
+        EmailBanMessageSender(post_id, problem_description, self.get_email, current_app).send_ban_notification()
+        # remove_article_from_search(post_id)
+
+        # There is no need to remove article in most cases, as they are
+        # only added to search when verified, so if they get banned, it
+        # often means they were not verified before.
+        # Special method will be implemented to ban posts that were
+        # verified. (in cases there is something wrong with
+        # copyrighting etc.)
 
     @property
     def get_role(self):
@@ -122,15 +133,16 @@ class EmailBanMessageSender:
                        'at {}.'
 
     def __init__(self, post_id: int, problem_description: str,
-                 admin_login: Admin, current_app) -> None:
-        self.admin_login = admin_login
+                 admin_email: str, current_app) -> None:
+        self.admin_email = admin_email
         self.problem_description = problem_description
         self.post_id = post_id
         self.post_title, user_id = self._get_post_data(post_id)
-        self.post_author, self.user_email = self._get_user_data(user_id)
+        self.user_email, self.post_author = self._get_user_data(user_id)
         self.mail = Mail(current_app)
 
-    def _get_post_data(self, post_id: int):
+    def _get_post_data(self, post_id: int) -> tuple:
+        """Get post's title and the id of the author by its id."""
         return self.database.get_information(f'SELECT title, user_id FROM posts '
                                              f'WHERE post_id="{post_id}"')
 
@@ -148,21 +160,35 @@ class EmailBanMessageSender:
         """Construct the email message."""
         message = Message(f'Post "{self.post_title}" was banned.',
                           recipients=[self.user_email],
-                          sender=('PronScience', 'defender0508@gmail.com'))
+                          sender=('PronamkaScience', 'defender0508@gmail.com'))
         body = self.standard_message.format(self.post_author, self.post_title,
-                                            self.problem_description, self.admin_login)
+                                            self.problem_description, self.admin_email)
         message.html = body
         return message
 
     def _get_user_data(self, user_id: int) -> tuple[str, str]:
         """Look for the user's email in database using
         given login."""
-        return self.database.get_information(f'SELECT email, login FROM '
-                                             f'users WHERE id="{user_id}"', (None,))[0]
+        return self.database.get_information(f'SELECT email, login FROM users WHERE id="{user_id}"')
 
 
 class UserFactory:
+    """Class for creating different user instances."""
     database = DataBase()
+
+    @classmethod
+    def create_auto(cls, user_id: int) -> Union[Viewer, Author, Admin]:
+        """Automatically decides, which role user should
+        have by looking it up in the database."""
+        _actions = {UserRole.Viewer: cls.create_viewer,
+                    UserRole.Creator: cls.create_author,
+                    UserRole.Admin: cls.create_admin}
+        # noinspection PyArgumentList
+        return _actions.get(cls.get_role(user_id))(user_id)
+
+    @classmethod
+    def get_role(cls, user_id: int) -> UserRole:
+        return UserRole(int(cls.database.get_information(f'SELECT role FROM users WHERE id="{user_id}"')[0]))
 
     @classmethod
     def create_viewer(cls, user_id: int) -> Viewer:
@@ -182,18 +208,17 @@ class UserFactory:
         return Admin(data)
 
     @classmethod
-    def _get_data(cls, user_id: int) -> list:
-        data = cls.database.get_information(f"SELECT login, email, registration_date, status "
+    def _get_data(cls, user_id: int) -> tuple:
+        data = cls.database.get_information(f"SELECT id, login, email, registration_date, status "
                                             f"FROM users WHERE id='{user_id}'")
         assert data is not None, 'User with given id does not exist. If you encountered this error, ' \
                                  'please contact us at defender0508@gmeail.com'
-        data = [i for i in data]
-        data.insert(0, user_id)
         return data
 
     @classmethod
-    def create_and_update(cls, user_id: int):
+    def update_role(cls, user_id: int):
+        """Update the Viewer instance to Author one.
+        This method gets called when a user makes his first post."""
         DataBase(access_level=3).update(f'UPDATE users SET role="2" WHERE id="{user_id}"')
         data = cls._get_data(user_id)
-        data.insert(5, UserRole(2))
         return Author(data)
