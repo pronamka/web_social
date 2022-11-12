@@ -1,4 +1,4 @@
-from typing import Union, Any, Literal, Callable, Optional
+from typing import Union, Any, Callable, Optional
 from enum import Enum
 from datetime import datetime, timedelta
 from json import dumps, JSONEncoder
@@ -16,20 +16,20 @@ from itsdangerous.exc import BadTimeSignature
 
 from server.app_core import app, users
 from server.database import DataBase
-from server.posts import PostForDisplay, AdminPostRegistry, UserPostRegistry, \
+from server.posts import AdminPostRegistry, UserPostRegistry, \
     FullyFeaturedPost, CommentsRegistry
 from server.user import UserFactory, Viewer, Author, Admin, UserRole
-from server.managers import Manager, BasicManager
+from server.managers import Manager
 from server.search_engine import search_post
 
 
 def login_required(current_session):
-
     """
     If you decorate a view with this, it will ensure that the current user is
     logged in and authenticated before calling the actual view.
     Note: this method is taken from flask-login library and slightly re-written
     to fit the system. Do not import this function from flask-login to avoid errors."""
+
     def decorated_view(function: Callable):
         @wraps(function)
         def fixed_decorated_view(*args, **kwargs):
@@ -43,11 +43,17 @@ def login_required(current_session):
             if callable(getattr(app, "ensure_sync", None)):
                 return app.ensure_sync(function)(*args, **kwargs)
             return function(*args, **kwargs)
+
         return fixed_decorated_view
+
     return decorated_view
 
 
 def admin_required(func: Callable):
+    """Check if the user that is trying to enter
+    a url is admin. If he is not, his attempt will
+    be aborted with http status code 418."""
+
     @wraps(func)
     def wrapper():
         if get_user().get_role == UserRole.Admin:
@@ -57,6 +63,7 @@ def admin_required(func: Callable):
                 return {'status': f'{e.__class__.__name__}: {e}'}
         else:
             return abort(418)
+
     return wrapper
 
 
@@ -66,16 +73,25 @@ def get_user() -> Union[Viewer, Author, Admin]:
 
 
 def search_for(query: str, required_amount: int = 5, start_with=0):
-    post_ids = [i.get('post_id') for i in search_post(query, limit=required_amount)]
+    """General function to search for posts and get information
+    about them."""
+    post_ids = [i.get('post_id') for i in search_post(query, limit=required_amount + start_with)[start_with:]]
     res = UserPostRegistry.get_posts_from_ids(post_ids)
     return dumps(res, cls=Encoder)
 
 
-def write_comment(post_id: str, comment_text: str) -> None:
+def write_comment(post_id: str, comment_text: str, is_reply: int = None) -> None:
+    """Add a comment to a certain post.
+    :param post_id: the id of the post under which a comment was left.
+    :param comment_text: the text of the comment.
+    :param is_reply: defines if the comment is a reply to another comment (it
+    equals to 0 if it is not or to an id of another comment, if it is)."""
+    # May be will be added as a method to any class
+    # that represents a post or manager.
     data_package = (post_id, str(get_user().get_user_id), comment_text,
-                    datetime.now().strftime("%A, %d. %B %Y %H:%M"))
-    DataBase(access_level=2).create(f'INSERT INTO comments(post_id, user_id, comment, date) '
-                                    f'VALUES(?, ?, ?, ?);', data=data_package)
+                    datetime.now().strftime("%A, %d. %B %Y %H:%M"), is_reply)
+    DataBase(access_level=2).create(f'INSERT INTO comments(post_id, user_id, comment, date, is_reply) '
+                                    f'VALUES(?, ?, ?, ?, ?);', data=data_package)
 
 
 class RegistrationState(Enum):
@@ -96,11 +112,17 @@ class LogInState(Enum):
 
 
 class Encoder(JSONEncoder):
+    """Class for encoding objects, that are not
+    serializable by default."""
+
     def default(self, o: Any) -> Any:
         return o.__dict__
 
 
 def author_required(func: Callable):
+    """Check if the user that is trying to commit
+    a certain action is an author."""
+
     def wrapper(self, *args):
         if get_user().get_role == UserRole.Viewer:
             return 0
@@ -112,7 +134,7 @@ def author_required(func: Callable):
 
 class InformationGetter:
     """Class for formalizing and getting information
-    for loading pages of development studio."""
+    for loading content for pages (usually called by js on client)"""
 
     def __init__(self, properties: dict, **kwargs):
         """Initialize InformationGetter.
@@ -121,26 +143,18 @@ class InformationGetter:
         :param kwargs: dictionary with some special
             information for loading exact values
             (e.g. how many posts were already loaded
-            and which too load now etc.). Not always required."""
+            and which to load now etc.). Not always required."""
         self.properties = properties
-        self.parameters = kwargs.get('parameters')
+        self.parameters: dict = kwargs.get('parameters')
         self.user = get_user()
-        self.protocols = {'subscribers': (self.get_subscriber_amount,),
+        self.protocols = {'subscribers': self.get_subscriber_amount,
                           'commentaries_made': ...,
-                          'commentaries_received': (self.amount_of_commentaries_received_on_post,
-                                                    (self.parameters.get('post_id'),)),
-                          'post_amount': (self.amount_of_posts,),
-                          'latest_posts': (self.get_latest_posts,
-                                           (self.parameters.get('posts_required', 1),
-                                            self.parameters.get('posts_loaded', 0),
-                                            self.parameters.get('of_user', True))),
-                          'dated_posts': (self.get_dated_posts,
-                                          (self.parameters.get('dates_loaded', 0),)),
-                          'latest_comments': (self.get_latest_comments,
-                                              (self.parameters.get('post_id', 0),
-                                               self.parameters.get('comments_required', 1),
-                                               self.parameters.get('comments_loaded', 0),
-                                               self.parameters.get('of_user', True)))}
+                          'commentaries_received': self.amount_of_commentaries_received_on_post,
+                          'post_amount': self.amount_of_posts,
+                          'latest_posts': self.get_latest_posts,
+                          'dated_posts': self.get_dated_posts,
+                          'latest_comments': self.get_latest_comments_on_post,
+                          'latest_comments_dev': self.get_latest_comments_of_users_posts}
 
     def get_full_data(self) -> dict:
         """Get all the data that was specified
@@ -153,37 +167,34 @@ class InformationGetter:
                 data[i] = result
         return data
 
-    def get_information(self, method: Literal['subscribers', 'commentaries_made',
-                                              'commentaries_received', 'post_amount', 'latest_posts']
-                        ) -> Union[tuple, list, int]:
+    def get_information(self, method: str) -> Union[tuple, list, int]:
         """Get information, if it's covered in protocols.
         :param method: a string defining which information
-            is needed. It is a key to the protocols dictionary.
-            All possible options described in the type hint."""
-        if (func := self.protocols.get(method)[0]) and len(self.protocols.get(method)) > 1:
-            # noinspection PyArgumentList
-            return func(*self.protocols.get(method)[1])
-        else:
-            return func()
+            is needed (a key to a dictionary with arguments)"""
+        return self.protocols.get(method)()
 
     def get_subscriber_amount(self):
         return self.user.SubscriptionManager.get_followers
 
-    @staticmethod
-    def get_latest_comments(post_id: int, amount: int = 1, start_with: int = 0,
-                            of_user: bool = True) -> tuple[FullyFeaturedPost]:
-        if of_user:
-            """May be used later for displaying analytics page."""
-            ...
-        else:
-            return CommentsRegistry(post_id).get_latest_comments(amount, start_with)
+    def get_latest_comments_on_post(self) -> tuple[FullyFeaturedPost]:
+        post_id, amount, start_with = self.parameters.get('post_id', 0), \
+                                      self.parameters.get('comments_required', 1), \
+                                      self.parameters.get('comments_loaded', 0)
+        return CommentsRegistry(post_id).get_latest_comments(amount, start_with)
 
-    def get_latest_posts(self, amount: int = 1, start_with: int = 0,
-                         of_user: bool = True) -> Union[int, tuple[FullyFeaturedPost]]:
+    def get_latest_comments_of_users_posts(self):
+        amount, start_with = self.parameters.get('comments_required'), \
+                             self.parameters.get('comments_loaded')
+        return self.user.PostManager.get_latest(amount, start_with, 'comments')
+
+    def get_latest_posts(self) -> Union[int, tuple[FullyFeaturedPost]]:
+        amount, start_with, of_user = self.parameters.get('posts_required', 1), \
+                                      self.parameters.get('posts_loaded', 0), \
+                                      self.parameters.get('of_user', True)
         if of_user and self.user.get_role == UserRole.Viewer:
             return 0
         elif of_user:
-            return self.user.PostManager.get_latest_posts(amount, start_with)
+            return self.user.PostManager.get_latest(amount, start_with, 'posts')
         else:
             return UserPostRegistry.get_posts(amount, start_with)
 
@@ -191,14 +202,15 @@ class InformationGetter:
         ...
 
     @author_required
-    def amount_of_commentaries_received_on_post(self, post_id: int):
-        return self.user.PostManager.get_comments_amount(post_id)
+    def amount_of_commentaries_received_on_post(self):
+        return self.user.PostManager.get_comments_amount(self.parameters.get('post_id'))
 
     @author_required
     def amount_of_posts(self):
         return self.user.PostManager.get_post_amount()
 
-    def get_dated_posts(self, dates_got: int = 0):
+    def get_dated_posts(self):
+        dates_got = self.parameters.get('dates_loaded', 0)
         today = datetime.today()
         required_date = (today - timedelta(dates_got)).strftime('%Y-%m-%d')
         follows = self.user.SubscriptionManager.get_follows
@@ -213,11 +225,8 @@ class InformationGetter:
         return posts, required_date, dates_got
 
 
-class PostLoader:
-    """Class that stores views for loading more posts.
-    It's methods get called automatically by js on client side.
-    The methods overlap each other, so our crew is developing
-    a method to combine them."""
+class InformationLoader:
+    """General class for getting information about posts and comments."""
 
     @staticmethod
     @app.route('/load_info/', methods=['GET', 'POST'])
@@ -233,7 +242,8 @@ class PostLoader:
                     'commentaries_received': 'amount',
                     'post_amount': 'object',
                     'subscribers': 'amount'},
-            'content': {'latest_posts': 'object'}}
+            'content': {'latest_posts': 'object'},
+            'comment_section': {'latest_comments_dev': 'object'}}
         data = InformationGetter(protocols.get(params.get('page')),
                                  parameters=params).get_full_data()
         return dumps(data, cls=Encoder)
@@ -249,48 +259,8 @@ class PostLoader:
         return dumps(data, cls=Encoder)
 
 
-class PrivatePage:
-    def __init__(self) -> None:
-        if get_user().get_role.value == 1:
-            self.latest_posts = PostRegistry.get_others_latest_posts()
-        elif get_user().get_role.value == 2:
-            self.latest_posts, self.my_latest_posts = PostRegistry.get_data()
-
-    @property
-    def get_latest_post(self) -> list:
-        return self.latest_posts
-
-
-class PostRegistry(BasicManager):
-    """An object for getting information needed to display a post"""
-
-    @classmethod
-    def get_data(cls) -> tuple:
-        """Get both latest post of users who the current user is subscribed to
-                and his own latest posts."""
-        return cls.get_others_latest_posts(), cls.get_my_latest_posts()
-
-    @classmethod
-    def get_others_latest_posts(cls) -> [str, list]:
-        """Get latest post of users who the current user is subscribed to."""
-        follows = get_user().SubscriptionManager.get_follows
-        if follows:
-            post_ids = cls.database.get_all_singles(f'SELECT MAX(post_id) FROM posts WHERE user_id IN '
-                                                    f'({", ".join(str(i) for i in follows)})')
-            return list(map(PostForDisplay, post_ids))
-        else:
-            return 'None of people who you follow have made a post.'
-
-    @classmethod
-    def get_my_latest_posts(cls) -> list:
-        """Get latest post of a current user"""
-        return get_user().PostManager.get_latest_posts(5)
-
-
 class LogInHandler(Manager):
-    """Class for conducting the logging in process"""
-    _actions = {1: UserFactory.create_viewer,
-                2: UserFactory.create_author, 3: UserFactory.create_admin}
+    """Class for conducting the logging in process."""
 
     def __init__(self) -> None:
         super(LogInHandler, self).__init__()
@@ -298,8 +268,7 @@ class LogInHandler(Manager):
         self.login = request.json.get('login')
 
     def force_log_in(self) -> None:
-        """Log in a user without doing any verification.
-        Used to re-login user if he already has an active session"""
+        """Log in a user, that already has an active session."""
         users.pop(session.get('login'))
         session.pop('login')
         self.log_user()
@@ -313,23 +282,27 @@ class LogInHandler(Manager):
 
     def _log_in(self, login: str) -> LogInState:
         """Update the user object,
-        log it in so it can pass through @login_required and add it to session."""
+        log it in, so it can pass through @login_required and add it to session."""
         info = self._find_by_login(login)
         # noinspection PyArgumentList
-        users[login] = self._actions.get(info[1])(info[0])
+        users[login] = UserFactory.create_auto(info[0])
         self._add_to_session(login)
         return LogInState.CredentialsFine
 
     def _add_to_session(self, login: str) -> None:
+        """Add a user to session."""
         login_user(users.get(login))
         session['login'] = login
         session['id'] = str(get_user().get_user_id)
         self._check_if_admin()
 
-    def _find_by_login(self, login: str) -> tuple[int, int]:
-        return self.database.get_information(f'SELECT id, role FROM users WHERE login="{login}"')
+    def _find_by_login(self, login: str) -> tuple[int]:
+        """Get the user's id from his login."""
+        return self.database.get_information(f'SELECT id FROM users WHERE login="{login}"')
 
     def _check_if_admin(self):
+        """Check if the user that is trying to log in is an admin.
+        Admins get redirected to other pages automatically."""
         if get_user().get_role == UserRole.Admin:
             self.status = LogInState.AdminUser
 
@@ -368,24 +341,28 @@ class LogInHandler(Manager):
                                    request.json.get('password'))
 
 
-class RegistrationHandler(Manager):
+class RegistrationHandler:
     """Class for conducting the registration process."""
 
     #  WARNING: users can create different accounts with one email.
     #  This is only to make testing easier and should be fixed before deployment
 
-    def __init__(self) -> None:
-        super().__init__(2)
-        self.login: str = request.form.get('login')
-        self.password: str = request.form.get('password')
-        self.email: str = request.form.get('email')
+    database = DataBase(access_level=2)
+
+    def __init__(self, login: str, password: str, email: str) -> None:
+        self.login: str = login
+        self.password: str = password
+        self.email = email
         self.status: RegistrationState = self._check_properties()
         self.error_messages = None
 
-    def resend_email(self) -> None:
+    @classmethod
+    def resend_email(cls, login: str) -> None:
         """Resend email. If you want to send email to a specific user do not use this function
         as it will send the message to the email address of a RegistrationHandler instance"""
-        email_confirmation_handler = EmailConfirmationHandler(self.login, self.email)
+        email = cls.database.get_information(f'SELECT email FROM users '
+                                             f'WHERE login="{login}" AND status=0')[0]
+        email_confirmation_handler = EmailConfirmationHandler(login, email)
         email_confirmation_handler.send_email()
 
     def create_new_user(self) -> None:
@@ -448,7 +425,6 @@ class Token:
     You do not need to create instances of this class to use it."""
 
     serializer = URLSafeTimedSerializer(app.config['SECRET_KEY'])  # this object is used to create and check tokens
-    database = DataBase(access_level=3)
 
     @classmethod
     def create_token(cls, user_id: int) -> str:
@@ -468,6 +444,7 @@ class Token:
 
 class EmailSenderWithToken(ABC):
     """Class for sending emails that require token."""
+
     database = DataBase()
 
     def __init__(self, email_address: str):
@@ -505,7 +482,7 @@ class EmailConfirmationHandler(EmailSenderWithToken):
 
     @app.route('/send_email/<login>/<email>')
     def send_email(self) -> str:
-        """Send the email message to it's recipients."""
+        """Send the email message to its recipients."""
         email_message = self._create_email()
         self.email_manager.send(email_message)
         return render_template('registration_page.html')
@@ -521,7 +498,7 @@ class EmailConfirmationHandler(EmailSenderWithToken):
             return 'Your account is confirmed, thanks. You can now close this page.'
 
     def _create_email(self) -> Message:
-        """Build the the actual email message (html)"""
+        """Build the actual email message (html)"""
         verification_message = Message('Confirm your email address', recipients=[self.email_address])
         verification_message.html = render_template('email_pages/confirmation_letter.html',
                                                     confirm_url=self._build_url())
@@ -542,7 +519,7 @@ class RestorePasswordNotificationSender(EmailSenderWithToken):
         super().__init__(email_address)
 
     def send_email(self) -> dict:
-        """General function to send an email to restore password.
+        """General function to send a message to restore password.
         Check if the user with given email(or login) exists and
         if he had confirmed his email address. If both conditions are
         true, a link, leading to a page for password restoration will
@@ -563,7 +540,7 @@ class RestorePasswordNotificationSender(EmailSenderWithToken):
         Token and password both sent as a body of the request via js fetch()."""
         password, token = request.json.values()
         if (user_id := Token.check_token(token)) is False:
-            return 'Ooops... The link is no longer valid.'
+            return 'Oops... The link is no longer valid.'
         password = generate_password_hash(password)
         DataBase(access_level=3).update(f'UPDATE users SET '
                                         f'password="{password}" WHERE id="{user_id}"')
@@ -596,6 +573,7 @@ class RestorePasswordNotificationSender(EmailSenderWithToken):
                                              default=(None,))[0]
 
     def _check_if_email_confirmed(self) -> Union[tuple, bool]:
+        """Check if user have confirmed his email before sending making
+        him able to restore his password."""
         return self.database.get_information(f'SELECT email FROM users WHERE email="'
                                              f'{self.email_address}" AND status="1"', False)
-
