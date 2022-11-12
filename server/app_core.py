@@ -31,7 +31,7 @@ db = SQLAlchemy(app)
 def admin_required(func: Callable):
     def wrapper(*args):
         role = DataBase().get_information(f'SELECT role FROM users WHERE '
-                                          f'id="{users.get(session.get("login")).get_user_id}"')
+                                          f'id="{users.get(session.get("login")).get_user_id}"')  # ignore that
         if role and role[0] == 3:
             return func(args[0])
         else:
