@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Union, Generator
+from typing import Optional, Union
 import os
 
 from server.database import DataBase
@@ -117,9 +117,9 @@ class CommentsRegistry:
         self.post_id = post_id
         self.comments = {}
         self.counter = 0
-        self.fetch_posts(5)
+        self.fetch_comments(5)
 
-    def fetch_posts(self, amount: int) -> None:
+    def fetch_comments(self, amount: int) -> None:
         res = self.database.get_all_singles(f'SELECT comment_id FROM comments '
                                             f'WHERE post_id="{self.post_id}"'
                                             f' ORDER BY comment_id DESC LIMIT {amount} '
@@ -130,29 +130,24 @@ class CommentsRegistry:
 
     def get_latest_comments(self, amount: int, start_with: int) -> tuple:
         """Get available_comment defined amount of user's posts starting from the latest one."""
-        if available_comments := self._check_comments_sufficiency(amount + start_with, amount):
+        if available_comments := self._check_comments_sufficiency(amount, start_with):
             comments = tuple(self.comments.values())[start_with:available_comments + start_with]
             return comments
 
-    def _check_comments_sufficiency(self, length: int, amount: int) -> Optional[int]:
+    def _check_comments_sufficiency(self, amount: int, start_with: int) -> Optional[int]:
         """Check if there is enough posts to return.
         If not, attempt will be made to load some new ones.
         If there is still not enough to return even one None will be returned."""
-        if length > self.counter:
-            self.fetch_posts(length - self.counter)
-        if (available_comments := self.counter - amount) <= 0 and length > self.counter:
+        if (overall_amount := amount + start_with) > self.counter:
+            self.fetch_comments(overall_amount - self.counter)
+        if (comments_available := (self.counter - amount)) <= 0 and start_with > self.counter:
             return
-        elif length > self.counter and available_comments > 0:
-            return available_comments
+        elif start_with < self.counter and comments_available <= 0:
+            return self.counter - start_with
+        elif overall_amount > self.counter and overall_amount > 0:
+            return overall_amount
         else:
             return amount
-
-    def define_comments(self, amount: int = 20) -> dict[int: Comment]:
-        """Get all the the comments from database."""
-        comment_ids = self.database.get_many_singles(f'SELECT comment_id FROM comments '
-                                                     f'WHERE post_id="{self.post_id}"', size=amount)
-        comments = {comment_id: Comment(comment_id) for comment_id in comment_ids}
-        return comments
 
     def __iter__(self):
         return self
@@ -170,12 +165,10 @@ class CommentsRegistry:
 
 
 class FullyFeaturedPost(PostForDisplay):
-    """PostForDisplay with a CommentRegistry
-    to access all comments on this post through it."""
+    """PostForDisplay with author id and avatar."""
 
     def __init__(self, post_id: int) -> None:
         super().__init__(post_id)
-        self.comment_registry = CommentsRegistry(self.post_id)
         self.author_id = self._define_author_id()
         self.author_avatar = self._get_author_avatar()
 
@@ -196,10 +189,6 @@ class FullyFeaturedPost(PostForDisplay):
     @property
     def get_author_id(self):
         return self.author_id
-
-    @property
-    def get_comments(self) -> CommentsRegistry:
-        return self.comment_registry
 
 
 class PostRegistry(ABC):
@@ -236,7 +225,10 @@ class UserPostRegistry(PostRegistry):
         return posts
 
     @classmethod
-    def get_subscription_posts(cls, date: str, follows: tuple):
+    def get_subscription_posts(cls, date: str, follows: tuple[int]):
+        """Get posts of some users on a specific date.
+        :param date: a string in format 'YYYY-MM-DD'
+        :param follows: a tuple with id's of users, whose posts are needed."""
         if len(follows) == 1:
             follows = (0, follows[0])
         data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE user_id IN {follows} '
@@ -246,13 +238,13 @@ class UserPostRegistry(PostRegistry):
 
     @classmethod
     def get_posts_from_ids(cls, post_ids: list,
-                           post_type: Union[PostForDisplay, FullyFeaturedPost]=PostForDisplay):
+                           post_type: Union[PostForDisplay, FullyFeaturedPost] = PostForDisplay):
+        """Get objects of a specific type (default PostForDisplay), that contains
+        information about the post, by their ids."""
         return [post_type(i) for i in post_ids]
 
 
 class AdminPostRegistry(PostRegistry):
-    #  need to add a system to verify posts
-    #  posts that are verified should not get displayed on the admins page
 
     @classmethod
     def get_posts(cls, amount: int, start_with: int):
