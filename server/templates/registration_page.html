@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Weblogins</title>
+    <title>PronamkaScience</title>
     <link rel='stylesheet' type="text/css" href="{{ url_for('static',  filename='css/styles_for_registration_page.css') }}">
     <meta name="viewport" content="width=device-width">
 </head>
@@ -20,39 +20,56 @@
     <div class="container">
         <div class="in_content">
             <h2>Create your account</h2>
-            <form action="" method="post">
+            <div id="inputs">
                 <i class="fa-solid fa-user"></i>
                 <input name="login" placeholder="login" type="text" class="info" id="login"><br>
                 <i class="fa-solid fa-lock"></i>
                 <input name="password" placeholder="password" type="password" class="info" id="password"><br>
                 <i class="fa-solid fa-envelope-open"></i>
                 <input name="email" placeholder="email" type="email" class="info" id="email"><br>
-                <input type="submit" value="Submit" onclick="checkInputs();" id="create_account_button">
-            </form>
+                <button onclick="sendData();" id="create_account_button">Submit</button>
+            </div>
             <p id="validation_errors">{{errors}}</p>
 
             <p>Already have an account? <a href="/log_in_page">Log in</a></p>
-            <script>
-                function checkInputs(){
-                    login = document.getElementById('login').value;
-                    email = document.getElementById('email').value;
-                    password = document.getElementById('password').value;
-                    if (login == '' | email == '' | password == ''){
-                        event.preventDefault();
-                        document.getElementById('validation_errors').innerHTML='Please, fill in all the fields.';
-                        return false;
-                    }
-                    else{
-                        tell();
-                        return true;
-                    }
-                }
-                function tell() {
-                alert('We have sent a confirmation email to you. Please, check it.');
-                }
-            </script>
+            
         </div>
     </div>
 </div>
+<script>
+    function sendRequest(method, url, body, multipart=false) {
+        const headers = {'Content-Type': 'application/json'}
+            return fetch(url, {
+                method: method,
+                body: JSON.stringify(body),
+                headers: headers}).then(response => {
+                return response.text();
+        })
+    }
+    function sendData(){
+        const login = document.getElementById('login').value;
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        if (login == '' | email == '' | password == ''){
+            document.getElementById('validation_errors').innerHTML='Please, fill in all the fields.';
+            return false;
+        }
+        else{
+            sendRequest('POST', '/register/', 
+            {'login': login, 'password': password, 'email': email}).then(resp =>{
+                const response = JSON.parse(resp)
+                const status = response['status']
+                console.log(response['redirect'])
+                if (status == 406){
+                    document.getElementById('validation_errors').innerHTML=response['errors'];
+                }
+                else if (status == 300) {
+                    alert('We have sent a confirmation email to you. Please, check it.');
+                    window.location.replace(response['redirect'])
+                }
+            })
+        }
+    }
+</script>
 </body>
 </html>
