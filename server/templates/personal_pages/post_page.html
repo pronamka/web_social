@@ -98,10 +98,13 @@
         })}
     
     function buildComments(comments){
-        const comment_amount = Object.keys(comments).length-1
-        for (var i=0, l=comment_amount; i<=l; i++){
-            var new_comment = new Comment(comments[i])
-            addComment(new_comment)
+        var comment_amount = 0
+        if(comments != null){
+            const comment_amount = Object.keys(comments).length-1
+            for (var i=0, l=comment_amount; i<=l; i++){
+                var new_comment = new Comment(comments[i])
+                addComment(new_comment)
+            }
         }
         if (comment_amount < 4){
             load_comments_btn.remove()

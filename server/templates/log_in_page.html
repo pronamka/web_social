@@ -25,13 +25,13 @@
     </dialog>
 
     <div class="container">
-        <h1>PronScience</h1>
+        <h1>PronamkaScience</h1>
         <h2>Log In</h2>
         <img src="{{ url_for('static', filename='images/enter.png') }}">
         <p id="near_image">Log in your account to acces all the functions</p>
 
-        <input name="login" placeholder="login" type="text"  class="info" id="login" accesskey="l">
-        <input name="password" placeholder="password" type="password" class="info" id="password" accesskey="p">
+        <input placeholder="login" type="text"  class="info" id="login" accesskey="l">
+        <input placeholder="password" type="password" class="info" id="password" accesskey="p">
         <button value="Log in" id="log_in" onclick="logIn()"></button>
 
         <a onclick="showRestorePasswordDialog()" href="#">Forgot your password?</a>

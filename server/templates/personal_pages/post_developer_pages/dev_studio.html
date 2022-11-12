@@ -12,6 +12,15 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
     filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
     <meta name="viewport" content="width=device-width">
+    <style>
+        #upload_article{
+            display: inline-block;
+            vertical-align: top;
+        }
+        #latest_comments_table{
+            -webkit-border-horizontal-spacing: 30px;
+        }
+    </style>
 </head>
 <body>
     <input type="checkbox" id="nav-toggle">
@@ -51,41 +60,57 @@
 <main role="main">
     <article>
         <div class="tab-content">
-            <div class="tabs__tab active" id="hub" data-tab-info>
+            <div class="tabs__tab  active" id="hub" data-tab-info>
                 <h2>Content-creatror account managment pannel.</h2>
                 <div id="last_post">
                 </div>
                 <div id="short_analitics"></div>
                 <dialog id="dialog-upload-file">
-                    <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
-                        <input type="file" name="file" placeholder="Select a file" id="inp-file">
-                        <input type="submit" name="send_file" placeholder="Post!">
-                    </form>
+                    <input type="file" name="file" placeholder="Select a file" id="inp-file">
+                    <button name="send_file" placeholder="Post!" onclick="uploadArticle()"></button>
                 </dialog>
             </div>
+
             <div class="tabs__tab" id="content" data-tab-info>
                 <h2>Your posts</h2>
+                <div id="upload_article">
+                    <input type="file" name="file" placeholder="Select a file" id="inp-file-content">
+                    <button name="send_file" placeholder="Post!" onclick="uploadArticle()"></button>
+                </div>
                 <div id="my_posts"></div>
             </div>
+
             <div class="tabs__tab" id="analitics" data-tab-info>
                 <h2>Publication analitics</h2>
                 <div id="subscribers_graph"></div>
                 <div id="comments_info"></div>
             </div>
+
             <div class="tabs__tab" id="commentaries" data-tab-info>
                 <h2>Comments on your publications</h2>
-                <div id="comments_flow"></div>
+                <dialog id="reply_dialog"></dialog>
+                <div id="comments_table_dv">
+                    <table id="latest_comments_table">
+                        <tr>
+                            <th>Author</th>
+                            <th>Created on</th>
+                            <th>Content</th>
+                            <th>On posts</th>
+                        </tr>
+                    </table>
+                </div>
             </div>
+
             <div class="tabs__tab" id="translations" data-tab-info>
                 <h2>Translations managment pannel</h2>
                 <div id="translations">In development...</div>
             </div>
+
             <div class="tabs__tab" id="copyright" data-tab-info></div>
             <div class="tabs__tab" id="monetization" data-tab-info></div>
         </div>
     </article>
 </main>
-<script src="{{ url_for('static', filename='js/jquery.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dev_studio/scripts_for_studio_main.js')}}"></script>
 </body>
 </html>

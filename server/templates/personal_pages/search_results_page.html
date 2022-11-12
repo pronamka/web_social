@@ -1,22 +1,21 @@
 {% extends 'personal_pages/base.html' %}
-{% block title %}<p id="page_title"></p>{% endblock %}
+{% block title %}Results for {{search_query}}{% endblock %}
 {% block content %}
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
 <meta name="viewport" content="width=device-width">
 <main role="main">
     <article>
         <div id="search_results"></div>
+        <button onclick="search_new()" id="more_posts_btn">More results</button>
     </article>
 </main>
 <script>
-    
-    var search_query = '{{search_query}}'
-    console.log(search_query)
-    document.addEventListener('DOMContentLoaded', display_first_results())
+    const settings = {'search_query': '{{search_query}}', 
+    'results_required': 5, 'results_recieved': 0}
+    document.addEventListener('DOMContentLoaded', search_new())
 
     function sendRequest(method, url, body) {
         const headers = {'Content-Type': 'application/json'}
-        console.log(body)
         return fetch(url, {
             method: method,
             body: JSON.stringify(body),
@@ -25,17 +24,21 @@
         })
     }
     
-    function display_first_results(){
-        sendRequest('POST', '/search/', {'query': search_query}).then(resp=>{
-            console.log(resp)
+    function search_new(){
+        sendRequest('POST', '/search/', settings).then(resp=>{
             var posts=JSON.parse(resp)
-            console.log(posts)
-            buildPosts(posts)
+            if (posts.length == 0){
+                addPost('<h2>No results</h2>')
+                document.getElementById('more_posts_btn').remove()
+            }
+            else{
+                settings['results_recieved'] += posts.length
+                buildPosts(posts)}
         })
     }
         
     function buildPosts(post_dict){
-        for (var i=0, l=Object.keys(post_dict).length; i<=l; i++){
+        for (var i=0, l=Object.keys(post_dict).length-1; i<=l; i++){
             try{
                 title = post_dict[i]['title'];
                 author = post_dict[i]['author'];

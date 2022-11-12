@@ -9,9 +9,14 @@
     <p>We have sent a letter to your email.<br>
     Please, follow the link in it to confirm your address.</p>
     <p>Didn't receive a letter?</p>
-    <form action="", method="post">
-        <input type="submit" name="submit" placeholder="Send again">
-    </form>
-    <p><a href="{{ '/log_in_page' }}">Log in</a></p>
+    <button onclick="resend_email()">Send again</button>
+    <p><a href="/log_in_page">Log in</a></p>
+    <script>
+        function resend_email(){
+            fetch('/resend_confirmation_email/{{login}}', {method: 'GET'}).then(resp =>{
+                alert('We have sent you one more email.')
+            })
+        }
+    </script>
 </body>
 </html>
