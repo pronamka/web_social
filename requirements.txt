@@ -1,0 +1,19 @@
+Python packages:
+	Package 		| 	Version
+	Flask				2.2.2	
+	Flask-Admin			1.6.0
+	Flask-Login			0.6.2	
+	Flask-Mail			0.9.1
+	Flask-SQLAlchemy		3.0.2
+	Pillow				9.3.0
+	PyPDF2				2.11.1
+	docx2pdf			0.1.8
+	pywin32				304
+	txtai				5.1.0
+	pdfkit				1.0.0
+
+Other software:
+	Microsoft Word (from 2007)
+	wkhtmltopdf (Version: 0.12.6; Should be installed in C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe
+			link to source: https://wkhtmltopdf.org/downloads.html)
+	
