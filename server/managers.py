@@ -4,7 +4,7 @@ from abc import ABC
 from typing import Optional, Literal
 
 from server.database import DataBase
-from server.posts import Post, UserPostRegistry, FullyFeaturedPost, Comment
+from server.posts import Post, UserPostRegistry, FullyFeaturedPost, Comment, CommentsRegistry
 
 
 class Manager(ABC):
@@ -30,7 +30,7 @@ class PostManager(Manager):
     def create_post(self, user_id: int, post_title: str) -> None:
         query = "INSERT INTO posts (user_id, title, date) VALUES (?, ?, ?);"
         data_package = (user_id, post_title, datetime.now().strftime("%A, %d. %B %Y %I:%M%p"))
-        self.database.create(query, data=data_package)
+        self.database.insert(query)
 
     def delete_post(self, post_id: int) -> None:
         self.database.delete(f"""DELETE FROM posts WHERE post_id='{post_id}'""")
@@ -42,8 +42,6 @@ class UserPostManager(UserManager):
     # responsibilities: both over posts and comments.
     # An effective way of separating them without
     # violating DRY should be found
-    comments_request = 'SELECT comment_id FROM comments WHERE post_id IN {} ' \
-                       'ORDER BY comment_id DESC LIMIT {} OFFSET {}'
 
     def __init__(self, user_id: int, *args) -> None:
         super(UserPostManager, self).__init__(user_id, 4)
@@ -54,11 +52,10 @@ class UserPostManager(UserManager):
         self.count = 0
         self.post_amount = 0
         self.comments_amount = 0
-        self.fetch_posts(5)
 
-    def fetch_posts(self, amount: int) -> int:
+    """def fetch_posts(self, amount: int) -> int:
         for post in UserPostRegistry.get_posts(amount, len(self.posts),
-                                               self.user_id, FullyFeaturedPost):
+                                               {'of_user': self.user_id}, FullyFeaturedPost):
             self.post_ids.append(post.get_id)
             self.posts[self.post_amount] = post
             self.post_amount += 1
@@ -79,40 +76,14 @@ class UserPostManager(UserManager):
         for i in get_comment_ids(amount):
             self.comments[self.comments_amount] = Comment(i)
             self.comments_amount += 1
-        return self.comments_amount
+        return self.comments_amount"""
 
-    def get_latest(self, amount: int, start_with: int,
-                   subject: Literal['posts', 'comments'] = 'posts') -> tuple:
-        """Get available_posts defined amount of user's posts starting from the latest one.
-        :param amount: the amount of required objects.
-        :param start_with: an integer, that defines, how many results should be
-                           ignored (starting from the beginning of any registry)
-        :param subject: a string, either 'posts' or 'comments' - defines
-                        what information is required.
-        """
-        protocols = {'posts': self.posts, 'comments': self.comments}
-        if available := self._check_sufficiency(amount, start_with, subject):
-            result = tuple(protocols.get(subject).values())[start_with:available + start_with]
-            return result
+    def get_latest_posts(self, amount: int, start_with: int):
+        res = UserPostRegistry.get_posts(amount, start_with, {'of_user': self.user_id})
+        return res
 
-    def _check_sufficiency(self, required_amount: int, start_with: int, subject: str) -> Optional[int]:
-        """Check if there is enough posts to return.
-        If not, attempt will be made to load some new ones.
-        If there is still not enough to return even one None will be returned."""
-        protocols = {'posts': (self.fetch_posts, self.post_amount),
-                     'comments': (self.fetch_comments, self.comments_amount)}
-        length = required_amount + start_with
-        func, amount = protocols.get(subject)
-        if length > amount:
-            amount = func(length - amount)
-        if (subjects_available := (amount - required_amount)) <= 0 and start_with > amount:
-            return
-        elif start_with < amount and subjects_available <= 0:
-            return amount - start_with
-        elif length > amount and subjects_available > 0:
-            return subjects_available
-        else:
-            return required_amount
+    def get_latest_comments(self, amount: int, start_with: int):
+        return CommentsRegistry.fetch_comments_on_users_post(amount, start_with, self.user_id)
 
     def get_post_amount(self):
         posts = self.database.get_information(f'SELECT COUNT(DISTINCT post_id) FROM posts '
