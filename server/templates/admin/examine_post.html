@@ -33,9 +33,7 @@
             </div>
             <div id="actions_dv">
                 <textarea placeholder="Problem description" id="problem_description"></textarea>
-                <button onclick="verify_post({'post_id': '{{post.get_id}}', 
-                'author_login': '{{post.get_author}}', 
-                'post_title': '{{post.get_title}}'});" id="verify_btn">Verify</button>
+                <button onclick="verify_post('{{post.get_id}}');" id="verify_btn">Verify</button>
                 <button onclick="ban_post('{{ post.get_id }}');" id="ban_btn">Ban</button>
             </div>
         </article>
@@ -55,8 +53,8 @@
             })
         }
 
-        function verify_post(info){
-            sendRequest('POST', '/admin/verify_post/', info).then(resp => respond(resp, 'verified'))
+        function verify_post(post_id){
+            sendRequest('POST', '/admin/verify_post/', {'post_id': post_id}).then(resp => respond(resp, 'verified'))
         }
 
         function ban_post(post_id){
