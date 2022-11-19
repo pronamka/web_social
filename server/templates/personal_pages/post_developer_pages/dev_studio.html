@@ -20,12 +20,16 @@
         #latest_comments_table{
             -webkit-border-horizontal-spacing: 30px;
         }
+        .comments_table_row:hover{
+            background-color: blanchedalmond;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <input type="checkbox" id="nav-toggle">
     <nav class="nav">
-        <label for="nav-toggle" class="nav-toggle" onclick></label>
+        <label for="nav-toggle" class="nav-toggle" onclick id="open_tab_lb"></label>
         <h2 class="logo">{{session.get('login')}}</h2>
         <img src="{{ url_for('static', filename= '/avatar_images/' + session.get('id') + '.jpeg') }}" class="avatar">
         <p id="status">Status: online</p>
@@ -38,13 +42,13 @@
                 <button data-tab-value="#hub">Hub</button>
             </li>
             <li>
-                <button data-tab-value="#content">Content</button>
+                <button data-tab-value="#content" id="dev go_to content">Content</button>
             </li>
             <li>
                 <button data-tab-value="#analitics">Analitics</button>
             </li>
             <li>
-                <button data-tab-value="#commentaries">Commentaries</button>
+                <button data-tab-value="#commentaries" id="dev go_to comments">Commentaries</button>
             </li>
             <li>
                 <button data-tab-value="#translations">Translations</button>
@@ -75,7 +79,7 @@
                 <h2>Your posts</h2>
                 <div id="upload_article">
                     <input type="file" name="file" placeholder="Select a file" id="inp-file-content">
-                    <button name="send_file" placeholder="Post!" onclick="uploadArticle()"></button>
+                    <button name="send_file" placeholder="Post!" onclick="uploadArticle()" id="send_article_btn"></button>
                 </div>
                 <div id="my_posts"></div>
             </div>
