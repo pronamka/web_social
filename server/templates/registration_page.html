@@ -59,9 +59,8 @@
             {'login': login, 'password': password, 'email': email}).then(resp =>{
                 const response = JSON.parse(resp)
                 const status = response['status']
-                console.log(response['redirect'])
                 if (status == 406){
-                    document.getElementById('validation_errors').innerHTML=response['errors'];
+                    document.getElementById('validation_errors').innerHTML=response['error'];
                 }
                 else if (status == 300) {
                     alert('We have sent a confirmation email to you. Please, check it.');
