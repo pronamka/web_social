@@ -1,6 +1,7 @@
 const request_url = '/load_info/';
 
-var settings = {'page': 'subscription_page', 'dates_loaded': 0}
+var settings = {'page': 'subscription_page', 'posts_required': 5, 'posts_loaded': 0,
+'last_date': 0}
 
 document.addEventListener('DOMContentLoaded', getPosts());
 
@@ -16,19 +17,21 @@ function sendRequest(method, url, body) {
 
 function getPosts(){
     sendRequest('POST', request_url, settings).then(resp => {
-        posts_dict = JSON.parse(resp);
-        settings['dates_loaded'] += posts_dict['dated_posts'][2] +1
+        const posts_dict = JSON.parse(resp);
+        settings['posts_loaded'] += settings['posts_required']
         buildPosts(posts_dict['dated_posts']);
     })
 }
-function buildPosts(post_dict){
-    posts = post_dict[0]
-    date = post_dict[1]
+function buildPosts(posts){
+    console.log(posts)
     if (posts.length > 0){
-        addHTML('<h3>'+date+'</h3>')
         for (var i=0, l=Object.keys(posts).length; i<=l; i++){
             try{
-                
+                if (settings['last_date'] != posts[i]['creation_date']){
+                    addHTML(`<h3>${posts[i]['creation_date']}</h3>`)
+                    addHTML('<div class="ln-dates-sep"></div>')
+                    settings['last_date'] = posts[i]['creation_date']
+                }
                 title = posts[i]['title'];
                 author = posts[i]['author'];
                 post_id = posts[i]['post_id'];
@@ -39,10 +42,6 @@ function buildPosts(post_dict){
             catch(error){
                 console.log(error);
             }
-        }
-        addHTML('<div class="ln-dates-sep"></div>')
-        if (posts.length < 5) {
-            getPosts();
         }
     }
 }
