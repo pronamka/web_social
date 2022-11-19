@@ -6,3 +6,6 @@
 /versions.txt
 /web_social.db
 /web_social_v2.db
+/functional_tests.py
+/unit_tests.py
+/testing
