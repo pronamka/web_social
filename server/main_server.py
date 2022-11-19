@@ -1,26 +1,28 @@
 from typing import Union
 from threading import Thread
+from datetime import datetime
 
 from flask import render_template, request, url_for, redirect, Response, session
 from flask_login import logout_user
 
 from server.app_core import app, login_manager, users
 from server.processes import RegistrationHandler, LogInHandler, RestorePasswordNotificationSender, \
-    get_user, write_comment, admin_required, login_required
+    get_user, write_comment, admin_required, login_required, author_required
 from server.utils import UsersObserver, FileManager
 from server.posts import FullyFeaturedPost
 from server.user import UserFactory, UserRole
 from server.processes import search_for
 
+# finish displaying replies on post page
+# finish new search system
 
 # Things that need fixing:
 #   1)User can have two personal page at once by just copy-pasting the link of his page
 #   or logging in as a different person. He might break system for himself in some
 #   cases.
 #
-#   2)Loading post with specific date on subscription page requires accessing
-#   database numerous times to find anything. It should only require accessing
-#   it one time, and looking for the first entry instead.
+# Add a system of priority when approving posts for admins (some posts will be top
+# priority and examined as quick as possible, while other will have to wait in a queue)
 #
 # Add a window to show progress when uploading a file.
 #
@@ -36,6 +38,8 @@ from server.processes import search_for
 #
 # Add a way to redact posts for admins.
 #
+# Add a reliance system to indicate users whose posts and comments get banned often
+#
 # Add a channel page where users will be able to see the posts and information about
 #  other user.
 #
@@ -44,12 +48,11 @@ from server.processes import search_for
 #   (by author) already.
 #   Add content to fields such as commentaries, analytics, translations, monetization etc.
 #
-#
-#
 # Post features:
 #   1)Add curse-comment ban system.
 #   2)Add preferences system based on posts tags.
 #
+
 
 Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
 
@@ -150,7 +153,7 @@ def admin_ban_post():
 @admin_required
 def admin_verify_post():
     """A view for verifying a post for admins."""
-    get_user().verify_post(*request.json.values())
+    get_user().verify_post(request.json.get('post_id'))
     return {'status': 'successful'}
 
 
@@ -193,16 +196,24 @@ def view_post():
 
 @app.route('/comment/', methods=['GET', 'POST'])
 @login_required(session)
-def add_comment():
+def add_comment() -> dict:
     """General function for starting the process of
     adding a comment."""
     #  There is no way to delete comment
-    #  neither for comments authors nor for post authors,
-    #  but this feature is coming soon.
+    #   for comment authors but this feature is coming soon.
     data = request.json
-    post_id, comment_text, is_reply = data.get('post_id'), data.get('comment_text'), \
-                                      data.get('is_reply', None)
+    post_id, comment_text, is_reply = data.get('post_id', None), data.get('comment_text'), \
+        data.get('is_reply', None)
     write_comment(post_id, comment_text, is_reply)
+    return {'author': get_user().get_login, 'text': comment_text,
+            'date': datetime.now().strftime("%A, %d. %B %Y %H:%M")}
+
+
+@app.route('/ban_comment/', methods=['POST'])
+@author_required
+def ban_comment():
+    comment_id, reason = request.json.values()
+    get_user().author_ban_comment(app, comment_id, reason)
     return Response(status=200)
 
 
