@@ -3,6 +3,16 @@
 {% block content %}
 <meta name="viewport" content="width=device-width">
 <main role="main">
+    <style>
+        #comments_dv{
+            position:relative; 
+            left:2%
+        }
+        .comment_text{
+            position:relative; 
+            left:4%
+        }
+    </style>
     <article>
     <div id="post_page">
         <div id="post">
@@ -35,11 +45,12 @@
     const load_comments_btn = document.getElementById('load_comments_btn')
     const post_id = '{{post.get_id}}'
     const author_id = '{{post.get_author_id}}'
-    const settings = {'page': 'view_post_page', 
-                      'post_id': post_id, 
+    const settings = {'page': 'comments', 
+                      'object_id': post_id, 
                       'comments_loaded': 0, 
                       'comments_required': 5, 
                       'of_user': 0}
+    const comments_with_replies = {}
     document.addEventListener('DOMContentLoaded', loadComments())
     
     function sendRequest(method, url, body) {
@@ -87,7 +98,10 @@
 
     function sendComment(post_id){
         sendRequest('POST', '/comment/', {'post_id': post_id, 
-        'comment_text': comment.value}).then(resp=>{})
+        'comment_text': comment.value}).then(resp=>{
+            const comment_dict = JSON.parse(resp)
+            addComment(comment_dict, true)
+        })
     }
 
     function loadComments(){
@@ -110,18 +124,71 @@
             load_comments_btn.remove()
         }
     }
-    function addComment(comment){
-        html = `<div class="comment">
-            <em>`+comment.author+`, at `+comment.date+`</em>
-            <p>`+comment.text+`</p>
-            </div>`
-        insertHTML('#comments_dv', html)
+    function addComment(comment, insert_before=false){
+        html = `<div class="comment" id="comment ${comment.id}">
+            <em><strong>${comment.author}</strong>, \t ${comment.date}</em>
+            <p class="comment_text">${comment.text}</p>`
+        if (comment.replies_amount != 0){
+            html+= `<button id='see_replies_btn ${comment.id}' 
+            onclick="loadReplies(${comment.id})">${comment.replies_amount} replies</button>`
+            comments_with_replies[comment.id] = [0, 5]
+        }
+        html += `<button onclick="reply(${comment.id})" id="comment_reply ${comment.id}">Reply</button></div>`
+        insertHTML('#comments_dv', html, insert_before)
+    }
+    function loadReplies(comment_id){
+        const cur_comment = comments_with_replies[comment_id]
+        sendRequest('POST', '/load_info/', {'object_id': comment_id, 'object_type':'reply',
+        'comments_loaded': cur_comment[0], 'comments_required': cur_comment[1], page: 'comments'}).then(resp=>{
+            console.log(resp)
+        }
+        )
+    }
+    function reply(comment_id){
+        node = document.getElementById(`comment_reply ${comment_id}`)
+        html = `<textarea id="comment_reply_text ${comment_id}" placeholder="Reply..."></textarea>
+        <button onclick="sendReply(${comment_id})" id="send_reply_btn ${comment_id}">Send</button>`
+        template = document.createElement('template')
+        template.innerHTML = html
+        document.getElementById(`comment ${comment_id}`).insertBefore(template.content, node.nextSibling)
+        document.getElementById(`comment_reply ${comment_id}`).remove()
+    }
+    function sendReply(comment_id){
+        console.log(comment_id)
+        var reply_text = document.getElementById(`comment_reply_text ${comment_id}`).value
+        if (reply_text.length == 0){
+            alert("You haven't written anything yet")
+        }
+        else{
+            sendRequest('POST', '/comment/', {'post_id': null,
+            'comment_text': reply_text, 'is_reply': comment_id}).then(resp=>{
+                document.getElementById(`comment_reply_text ${comment_id}`).remove()
+                document.getElementById(`send_reply_btn ${comment_id}`).remove()
+                var load_replies_button = document.getElementById(`see_replies_btn ${comment_id}`)
+                if (load_replies_button == null){
+                    node=document.getElementById(`comment_reply ${comment_id}`)
+                    html = `<button id='see_replies_btn ${comment_id} 
+                    onclick="loadReplies(${comment_id})">1 reply</button>`
+                    template = document.createElement('template')
+                    template.innerHTML = html
+                    document.getElementById(`comment ${comment_id}`).insertBefore(template.content, node)
+                }
+            })
+        }
     }
     class Comment{
-        constructor(comments_item){
-            this.comment_author = comments_item['author'];
-            this.creation_date = comments_item['date'];
-            this.comment = comments_item['text'];
+        constructor(comment){
+            this.comment_id = comment['comment_id'];
+            this.comment_author = comment['author'];
+            this.creation_date = comment['made_ago'];
+            if (comment['made_ago'] == 0){
+                this.creation_date = 'Today'
+            }
+            else{
+                this.creation_date = comment['made_ago'] + ' ago';
+            }
+            this.comment = comment['text'];
+            this.replies_num = comment['replies_amount']
         }
         get allValues(){
             return (this.author, this.creation_date, this.text);
@@ -135,15 +202,28 @@
         get text(){
             return this.comment
         }
+        get replies_amount(){
+            return this.replies_num
+        }
+        get id(){
+            return this.comment_id
+        }
         
     }
-    function insertHTML(direction, html) {
+    function insertHTML(direction, html, insert_before=false) {
         const tab = document.querySelector(direction);
         var template = document.createElement('template');
         html = html.trim(); // Never return a text node of whitespace as the result
         template.innerHTML = html;
-        tab.appendChild(template.content);
-        return template.content.firstChild;
+        if (insert_before==false){
+            tab.appendChild(template.content);
+            return template.content.firstChild;
+        }
+        else{
+            console.log(tab, tab.firstChild, template)
+            tab.insertBefore(template.content, tab.firstChild)
+            return template.content.firstChild;
+        }
     }
     
 </script>
