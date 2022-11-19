@@ -9,6 +9,7 @@ const action_protocols = {'hub': {'call': loadHub, 'called': 1},
 const content_page = {'page': 'content', 'posts_loaded': 0, 'posts_required': 2, 'post_type': 'FullyFeaturedPost'}
 const comments_page = {'page': 'comment_section', 'comments_loaded': 0, 'comments_required': 10}
 const btn_upload_files = document.querySelector('btn-upload-files');
+const comments_with_replies = {}
 
 document.addEventListener('DOMContentLoaded', loadHub());
 
@@ -77,9 +78,7 @@ function loadContentPage(){
 
 function loadCommentsPage(){
     sendRequest('POST', '/load_info/', comments_page).then(resp=>{
-        console.log(resp)
         comments = JSON.parse(resp)
-        console.log(comments)
         comments_page['comments_loaded'] += comments_page['comments_required']
         insertHTML('#latest_comments_table', buildComments(comments['latest_comments_dev']))
     })
@@ -110,24 +109,43 @@ class Comment{
     }
 
 }
-function buildComments(comments_array){
+function buildComments(comments_array, indent=0){
     comments = '';
     if (comments_array.length == 0){
         return 'No comments.'
     }
     for (var i=0, l=Object.keys(comments_array).length-1; i<=l; i++){
         const comment = new Comment(comments_array[i])
-        console.log(comment)
         var cur_id = comment.comment_id
-        comments += `<tr>
-        <td id="author ${cur_id}">${comment.author}</td>
-        <td id="date ${cur_id}">${comment.date}</td>
-        <td id="text ${cur_id}">${comment.text}</td>
-        <td id="post_id ${cur_id}">${comment.post_id}</td>
-        <td id="reply ${cur_id}"><button onclick="reply([`+comment.comment_id+`, '`+comment.author+`', '`+comment.text+`', `+comment.post_id+`])">Reply</button></td>
+        comments_with_replies[cur_id] = [0, 5]
+        data_package = `[${comment.comment_id}, '${comment.author}', '${comment.text}', ${comment.post_id}]`
+        comments += `<tr class="comments_table_row" title="Click to see replies." 
+        onclick="loadReplies(${cur_id})" id="comment_row ${cur_id}" style="position: relative; left: ${indent};">
+        <td>${comment.author}</td>
+        <td>${comment.date}</td>
+        <td>${comment.text}</td>
+        <td>${comment.post_id}</td>
+        <td><button onclick="reply(${data_package})">Reply</button></td>
+        <td><button onclick="ban(${data_package})">Ban</button></td>
         </tr>`
     }
     return comments
+}
+function loadReplies(comment_id){
+    var cur_comment = comments_with_replies[comment_id]
+    console.log(cur_comment)
+    sendRequest('POST', '/load_info/', {'page': 'comments', 
+    'object_id': comment_id, 'comments_required': cur_comment[1], 
+    'comments_loaded': cur_comment[0], 'object_type': 'reply'}).then(resp =>{
+        comments_with_replies[comment_id][0] += cur_comment[1]
+        const comments = buildComments(JSON.parse(resp)['latest_comments'], '50px').trim()
+        const tab = document.getElementById('latest_comments_table');
+        const after_element = document.getElementById(`comment_row ${comment_id}`)
+        var template = document.createElement('template');
+        template.innerHTML = comments;
+        tab.insertBefore(template.content, after_element.nextSibling)
+    }
+    )
 }
 function reply(comment){
     var reply_dialog = document.querySelector('#reply_dialog')
@@ -135,13 +153,40 @@ function reply(comment){
     <p>${comment[1]}'s comment</p>
     <p>${comment[2]}<p>
         <input type="text" placeholder="Your reply" id="inp-comment-reply ${comment[0]}">
-        <button placeholder="Reply" onclick="sendReply([`+comment[0]+`, '`+comment[1]+`', '`+comment[2]+`', `+comment[3]+`])"></button>`
+        <button id="send_reply_btn ${comment[0]}" placeholder="Reply" 
+        onclick="sendReply([${comment[0]}, '${comment[1]}'
+        , ${comment[3]}])">Send reply</button>`
     reply_dialog.showModal()
 }
 
+function ban(comment){
+    var reply_dialog = document.querySelector('#reply_dialog')
+    reply_dialog.innerHTML = `<h2>Ban<h2>
+    <p>${comment[1]}'s comment</p>
+    <p>${comment[2]}<p>
+    <p>State a reason (optional):<p>
+    <input type="text" placeholder="Reason" id="inp-comment-ban ${comment[0]}">
+    <button id="ban_comment_btn ${comment[0]}" 
+    onclick="sendBanRequest(${comment[0]})">Ban</button>`
+    reply_dialog.showModal()
+}
+function sendBanRequest(comment_id){
+    console.log(comment_id)
+    var reason = document.getElementById(`inp-comment-ban ${comment_id}`).value
+    console.log(reason)
+    sendRequest('POST', '/ban_comment/', {'comment_id': comment_id, 
+    'reason': reason}).then(resp=>{
+        console.log(resp)
+        document.querySelector('#reply_dialog').close()
+    })
+}
+
 function sendReply(comment){
-    sendRequest('POST', '/comment/', {'post_id': comment[3] ,
-    'reply_text': comment[2], 'is_reply': comment[0]})
+    const reply_text = document.getElementById(`inp-comment-reply ${comment[0]}`).value
+    sendRequest('POST', '/comment/', {'post_id': comment[2] ,
+    'comment_text': reply_text, 'is_reply': comment[0]}).then(resp=>{
+        document.querySelector('#reply_dialog').close()
+    })
 }
 
 current_position = 250
