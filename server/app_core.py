@@ -14,10 +14,10 @@ app.config['SECRET_KEY'] = 'purple'
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
-app.config['MAIL_USERNAME'] = 'defender0508'
-app.config['MAIL_DEFAULT_SENDER'] = 'defender0508@gmail.com'
-app.config['MAIL_PASSWORD'] = 'dnqqunaesokbfrok'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///web_social_v2.db'
+app.config['MAIL_USERNAME'] = ''
+app.config['MAIL_DEFAULT_SENDER'] = ''
+app.config['MAIL_PASSWORD'] = ''
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///web_social_v4.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 login_manager = LoginManager(app)
