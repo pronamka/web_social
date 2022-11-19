@@ -1,6 +1,6 @@
 from typing import Union, Any, Callable, Optional
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime
 from json import dumps, JSONEncoder
 from abc import ABC, abstractmethod
 from functools import wraps
@@ -35,7 +35,13 @@ def login_required(current_session):
         def fixed_decorated_view(*args, **kwargs):
             if request.method in {"OPTIONS"} or app.config.get("LOGIN_DISABLED"):
                 pass
-            elif not current_session.get('login'):
+            elif (login := current_session.get('login', None)) and not users.get(login, None):
+                return "<h1>Oops...</h1>" \
+                       "<h2>It's our fault!</h2>" \
+                       "<h4>Sorry, it looks like we had to relaunch the server," \
+                       "while you were logged in. Please follow this link to go to " \
+                       "the log in page: <a href='/log_in_page'>Go to log in page</a></h4>"
+            elif not current_session.get('login', None):
                 return app.login_manager.unauthorized()
 
             # flask 1.x compatibility
@@ -67,6 +73,22 @@ def admin_required(func: Callable):
     return wrapper
 
 
+def author_required(func: Callable):
+    """Check if the user that is trying to commit
+    a certain action is an author."""
+
+    def wrapper(*args):
+        if get_user().get_role == UserRole.Viewer:
+            return 0
+        else:
+            if args:
+                return func(args[0], *args[1:-1])
+            else:
+                return func()
+
+    return wrapper
+
+
 def get_user() -> Union[Viewer, Author, Admin]:
     """Get the user object that corresponds with the client machine."""
     return users.get(session.get('login'))
@@ -75,12 +97,12 @@ def get_user() -> Union[Viewer, Author, Admin]:
 def search_for(query: str, required_amount: int = 5, start_with=0):
     """General function to search for posts and get information
     about them."""
-    post_ids = [i.get('post_id') for i in search_post(query, limit=required_amount + start_with)[start_with:]]
+    post_ids = search_post(query, limit=required_amount + start_with)[start_with:]
     res = UserPostRegistry.get_posts_from_ids(post_ids)
     return dumps(res, cls=Encoder)
 
 
-def write_comment(post_id: str, comment_text: str, is_reply: int = None) -> None:
+def write_comment(post_id: int, comment_text: str, is_reply: int = None) -> None:
     """Add a comment to a certain post.
     :param post_id: the id of the post under which a comment was left.
     :param comment_text: the text of the comment.
@@ -88,10 +110,17 @@ def write_comment(post_id: str, comment_text: str, is_reply: int = None) -> None
     equals to 0 if it is not or to an id of another comment, if it is)."""
     # May be will be added as a method to any class
     # that represents a post or manager.
-    data_package = (post_id, str(get_user().get_user_id), comment_text,
-                    datetime.now().strftime("%A, %d. %B %Y %H:%M"), is_reply)
-    DataBase(access_level=2).create(f'INSERT INTO comments(post_id, user_id, comment, date, is_reply) '
-                                    f'VALUES(?, ?, ?, ?, ?);', data=data_package)
+    if is_reply:
+        post_id = DataBase().get_information(f'SELECT post_id FROM comments WHERE comment_id={is_reply}')[0]
+    cur_user_id = get_user().get_user_id
+    data_package = [post_id, comment_text, datetime.now().strftime("%A, %d. %B %Y %H:%M"),
+                    is_reply]
+    if is_reply and FullyFeaturedPost(int(post_id)).get_author_id == cur_user_id:
+        get_user().author_reply(*data_package)
+    else:
+        data_package.append(cur_user_id)
+        DataBase(access_level=2).insert(f'INSERT INTO comments(post_id, comment, date, is_reply, '
+                                        f'user_id) VALUES(?, ?, ?, ?, ?);', data=data_package)
 
 
 class RegistrationState(Enum):
@@ -119,19 +148,6 @@ class Encoder(JSONEncoder):
         return o.__dict__
 
 
-def author_required(func: Callable):
-    """Check if the user that is trying to commit
-    a certain action is an author."""
-
-    def wrapper(self, *args):
-        if get_user().get_role == UserRole.Viewer:
-            return 0
-        else:
-            return func(self, *args)
-
-    return wrapper
-
-
 class InformationGetter:
     """Class for formalizing and getting information
     for loading content for pages (usually called by js on client)"""
@@ -153,15 +169,16 @@ class InformationGetter:
                           'post_amount': self.amount_of_posts,
                           'latest_posts': self.get_latest_posts,
                           'dated_posts': self.get_dated_posts,
-                          'latest_comments': self.get_latest_comments_on_post,
-                          'latest_comments_dev': self.get_latest_comments_of_users_posts}
+                          'latest_comments': self.get_latest_comments_or_replies,
+                          'latest_comments_dev': self.get_latest_comments_on_users_posts}
 
     def get_full_data(self) -> dict:
         """Get all the data that was specified
         when initializing the InformationGetter."""
         data = {}
         for i in self.properties.keys():
-            if (result := self.get_information(i)) != 0 and self.properties.get(i) == 'amount':
+            if not isinstance(result := self.get_information(i), int) \
+                    and self.properties.get(i) == 'amount':
                 data[i] = len(result)
             else:
                 data[i] = result
@@ -176,16 +193,22 @@ class InformationGetter:
     def get_subscriber_amount(self):
         return self.user.SubscriptionManager.get_followers
 
-    def get_latest_comments_on_post(self) -> tuple[FullyFeaturedPost]:
-        post_id, amount, start_with = self.parameters.get('post_id', 0), \
-                                      self.parameters.get('comments_required', 1), \
-                                      self.parameters.get('comments_loaded', 0)
-        return CommentsRegistry(post_id).get_latest_comments(amount, start_with)
+    def _get_from_parameters(self, parameter_keys: dict) -> tuple:
+        existing_keys = self.parameters.keys()
+        res = tuple((parameter_keys[item] if item not in existing_keys else self.parameters.get(item))
+                    for position, item in enumerate(parameter_keys))
+        return res
 
-    def get_latest_comments_of_users_posts(self):
+    def get_latest_comments_or_replies(self) -> tuple[FullyFeaturedPost]:
+        post_id, amount, start_with, content_type = \
+            self._get_from_parameters({'object_id': 0, 'comments_required': 1,
+                                       'comments_loaded': 0, 'object_type': 'comment'})
+        return CommentsRegistry.fetch_(content_type, post_id, amount, start_with)
+
+    def get_latest_comments_on_users_posts(self):
         amount, start_with = self.parameters.get('comments_required'), \
                              self.parameters.get('comments_loaded')
-        return self.user.PostManager.get_latest(amount, start_with, 'comments')
+        return self.user.PostManager.get_latest_comments(amount, start_with)
 
     def get_latest_posts(self) -> Union[int, tuple[FullyFeaturedPost]]:
         amount, start_with, of_user = self.parameters.get('posts_required', 1), \
@@ -194,9 +217,9 @@ class InformationGetter:
         if of_user and self.user.get_role == UserRole.Viewer:
             return 0
         elif of_user:
-            return self.user.PostManager.get_latest(amount, start_with, 'posts')
+            return self.user.PostManager.get_latest_posts(amount, start_with)
         else:
-            return UserPostRegistry.get_posts(amount, start_with)
+            return UserPostRegistry.get_posts(amount, start_with, {'verified': True})
 
     def amount_of_commentaries_made(self, *args):
         ...
@@ -210,19 +233,10 @@ class InformationGetter:
         return self.user.PostManager.get_post_amount()
 
     def get_dated_posts(self):
-        dates_got = self.parameters.get('dates_loaded', 0)
-        today = datetime.today()
-        required_date = (today - timedelta(dates_got)).strftime('%Y-%m-%d')
-        follows = self.user.SubscriptionManager.get_follows
-        post_manager = UserPostRegistry()
-        posts = post_manager.get_subscription_posts(required_date, follows)
-        while not posts and required_date > '2022-09-15':  # 2022-09-15 is the date
-            # of first post ever created. If the date goes below that, there is no need
-            # to look for new posts, as there are none of them.
-            dates_got += 1
-            required_date = (today - timedelta(dates_got)).strftime('%Y-%m-%d')
-            posts = post_manager.get_subscription_posts(required_date, follows)
-        return posts, required_date, dates_got
+        amount, start_with = self._get_from_parameters({'posts_required': 1, 'posts_loaded': 0})
+        follows = fol if len((fol := self.user.SubscriptionManager.get_follows)) >= 2 else list(fol).append(0)
+        posts = UserPostRegistry.get_posts(amount, start_with, {'from_subscriptions': follows, 'verified': True})
+        return posts
 
 
 class InformationLoader:
@@ -237,25 +251,23 @@ class InformationLoader:
         protocols = {
             'main_user_page': {'latest_posts': 'object'},
             'subscription_page': {'dated_posts': 'object'},
-            'view_post_page': {'latest_comments': 'object'},
+            'comments': {'latest_comments': 'object'},
             'hub': {'latest_posts': 'object',
                     'commentaries_received': 'amount',
                     'post_amount': 'object',
                     'subscribers': 'amount'},
             'content': {'latest_posts': 'object'},
-            'comment_section': {'latest_comments_dev': 'object'}}
+            'comment_section': {'latest_comments_dev': 'object'},}
         data = InformationGetter(protocols.get(params.get('page')),
                                  parameters=params).get_full_data()
         return dumps(data, cls=Encoder)
 
     @staticmethod
-    @app.route('/admin_get_posts', methods=['GET', 'POST'])
+    @app.route('/admin_get_posts/', methods=['GET', 'POST'])
     @admin_required
     def admin_get_posts() -> str:
-        data = {}
         posts_loaded, posts_required = request.json.values()
-        for i in enumerate(AdminPostRegistry.get_posts(posts_required, posts_loaded)):
-            data[i[0]] = i[1]
+        data = AdminPostRegistry.get_posts(posts_required, posts_loaded)
         return dumps(data, cls=Encoder)
 
 
@@ -397,7 +409,7 @@ class RegistrationHandler:
         """Creates the row in database containing user data."""
         user_data = self._build_data_package()
         query = f"INSERT INTO users (login, password, email, registration_date) VALUES (?, ?, ?, ?);"
-        self.database.create(query, data=user_data)
+        self.database.insert(query, data=user_data)
 
     def _build_data_package(self) -> tuple:
         """Gathers all user data in one package."""
