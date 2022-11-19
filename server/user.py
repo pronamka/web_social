@@ -1,13 +1,13 @@
 import os
 from enum import Enum
 from abc import ABC, abstractmethod
-from typing import Union
+from typing import Union, Optional
 
 from flask_login import UserMixin
 from flask_mail import Mail, Message
 
-from server.search_engine import add_article_to_search
 from server.managers import UserSubscriptionManager, UserPostManager
+from server.posts import Comment
 from server.database import DataBase
 
 
@@ -84,9 +84,23 @@ class Viewer(User):
 
 
 class Author(User):
+    reply_sql = f'INSERT INTO comments(post_id, user_id, comment, date, is_reply, status) ' \
+                f'VALUES(?, ?, ?, ?, ?, ?);'
+
     def __init__(self, data: tuple):
         super().__init__(data)
         self.PostManager = UserPostManager(self.user_id)
+
+    def author_reply(self, post_id: int, reply_text: str,
+                     accurate_time: str, comment_id: int) -> None:
+        database = DataBase(access_level=3)
+        data_package = (post_id, self.user_id, reply_text, accurate_time, comment_id, 1)
+        database.insert(self.reply_sql, data=data_package)
+        database.update(f'UPDATE comments SET status=2 WHERE comment_id="{comment_id}"')
+
+    def author_ban_comment(self, current_app, comment_id: int, reason: Optional[str] = None):
+        CommentBanMessageSender(current_app, comment_id,
+                                self.get_login, reason).send_ban_notification()
 
     @property
     def get_role(self):
@@ -98,78 +112,131 @@ class Admin(User):
         super().__init__(data)
         self.PostManager = UserPostManager(self.user_id)
 
-    @staticmethod
-    def verify_post(post_id: int, post_title: str) -> None:
-        DataBase(access_level=3).update(f'UPDATE posts SET verified=1 WHERE post_id="{post_id}"')
-        add_article_to_search(post_title, post_id)
+    @classmethod
+    def verify_post(cls, post_id: int) -> None:
+        db = DataBase(access_level=3)
+        db.update(f'UPDATE posts SET verified=1 WHERE post_id={post_id}')
 
-    def ban_post(self, post_id, problem_description, current_app):
-        EmailBanMessageSender(post_id, problem_description, self.get_email, current_app).send_ban_notification()
-        # remove_article_from_search(post_id)
-
-        # There is no need to remove article in most cases, as they are
-        # only added to search when verified, so if they get banned, it
-        # often means they were not verified before.
-        # Special method will be implemented to ban posts that were
-        # verified. (in cases there is something wrong with
-        # copyrighting etc.)
+    def ban_post(self, post_id: int, problem_description: str, current_app) -> None:
+        PostBanMessageSender(current_app, post_id, problem_description,
+                             self.get_email).send_ban_notification()
 
     @property
     def get_role(self):
         return UserRole.Admin
 
 
-class EmailBanMessageSender:
-    """Class for sending notifications about banning
-    user's post. It is not a subclass of EmailSenderWithToken,
-    as it doesn't require one."""
+class EmailBanMessageSender(ABC):
     database = DataBase()
-    standard_message = 'Dear {}, \n' \
-                       'This message is sent to you by PronScience to ' \
-                       'inform you that one of your posts - "{}" ' \
-                       'was banned for the following reason: "{}". \n' \
-                       'If you have any questions or complains, please contact the ' \
-                       'member of our post-checking crew on the platform or ' \
-                       'at {}.'
 
-    def __init__(self, post_id: int, problem_description: str,
-                 admin_email: str, current_app) -> None:
-        self.admin_email = admin_email
-        self.problem_description = problem_description
-        self.post_id = post_id
-        self.post_title, user_id = self._get_post_data(post_id)
-        self.user_email, self.post_author = self._get_user_data(user_id)
-        self.mail = Mail(current_app)
+    def __init__(self, app):
+        self.mail = Mail(app)
+
+    def _get_user_data(self, user_id: int) -> tuple[str, str]:
+        """Look for the user's email in database using given login."""
+        return self.database.get_information(f'SELECT email, login FROM users WHERE id="{user_id}"')
 
     def _get_post_data(self, post_id: int) -> tuple:
         """Get post's title and the id of the author by its id."""
         return self.database.get_information(f'SELECT title, user_id FROM posts '
                                              f'WHERE post_id="{post_id}"')
 
+    @abstractmethod
     def send_ban_notification(self) -> None:
         """General function for construction and sending an email message."""
-        self._update_post_status()
+
+    @abstractmethod
+    def _update_status(self) -> None:
+        """Set the object's status to 'banned'."""
+
+    @abstractmethod
+    def _build_message(self) -> Message:
+        """Construct the email message."""
+
+
+class CommentBanMessageSender(EmailBanMessageSender):
+    standard_message = 'Dear {}, \n' \
+                       'This message is sent to you by PronamkaScience to ' \
+                       'inform you that one of your comments - "{}" ' \
+                       'under the post "{}" of user {} ' \
+                       'was banned{}. \n' \
+                       'Post author has a right to ban any comments under their posts, ' \
+                       'so, please, check out the policy of the author before writing comments.'
+
+    def __init__(self, app, comment_id: int, author_login: str,
+                 reason: Optional[str] = None) -> None:
+        super().__init__(app)
+        self.comment_id = comment_id
+        self.comment = Comment(comment_id)
+        self.post_title = self._get_post_data(self.comment.post_id)[0]
+        self.post_author_login = author_login
+        self.user_email, self.user_login = self._get_user_data(self.comment.user_id)
+        self.reason = reason
+
+    def send_ban_notification(self) -> None:
+        """General function for construction and sending an email message."""
+        self._update_status()
         self.mail.send(self._build_message())
 
-    def _update_post_status(self) -> None:
-        """Set post status from 0(or from 1, but unlikely) to 2(banned)."""
-        DataBase(access_level=3).update(f'UPDATE posts SET '
-                                        f'verified=2 WHERE post_id="{self.post_id}"')
+    def _update_status(self) -> None:
+        """Set comments status  to 2(banned)."""
+        DataBase(access_level=3).update(f'UPDATE comments SET status=3 '
+                                        f'WHERE comment_id="{self.comment_id}"')
 
     def _build_message(self) -> Message:
         """Construct the email message."""
-        message = Message(f'Post "{self.post_title}" was banned.',
+        message = Message(f'Comment "{self.comment.text}" was banned.',
                           recipients=[self.user_email],
+                          sender=('PronamkaScience', 'defender0508@gmail.com'))
+        body = self.standard_message.format(self.user_login, self.comment.get_text,
+                                            self.post_title, self.post_author_login,
+                                            self._build_reason())
+        message.html = body
+        return message
+
+    def _build_reason(self) -> str:
+        if self.reason:
+            return ' for the following reason: ' + self.reason
+        else:
+            return ''
+
+
+class PostBanMessageSender(EmailBanMessageSender):
+    standard_message = 'Dear {}, \n' \
+                       'This message is sent to you by PronamkaScience to ' \
+                       'inform you that one of your posts - "{}" ' \
+                       'was banned for the following reason: "{}". \n' \
+                       'If you have any questions or complains, please contact the ' \
+                       'member of our post-checking crew on the platform or ' \
+                       'at {}.'
+
+    def __init__(self, app, post_id: int, problem_description: str,
+                 admin_email: str):
+        super().__init__(app)
+        self.admin_email = admin_email
+        self.problem_description = problem_description
+        self.post_id = post_id
+        self.post_title, user_id = self._get_post_data(post_id)
+        self.user_email, self.post_author = self._get_user_data(user_id)
+
+    def send_ban_notification(self) -> None:
+        """General function for construction and sending an email message."""
+        self._update_status()
+        self.mail.send(self._build_message())
+
+    def _update_status(self) -> None:
+        """Set post status from 0(or from 1, but unlikely) to 2(banned)."""
+        DataBase(access_level=3).update(f'UPDATE posts SET verified=2 '
+                                        f'WHERE post_id="{self.post_id}"')
+
+    def _build_message(self) -> Message:
+        """Construct the email message."""
+        message = Message(f'Post "{self.post_title}" was banned.', recipients=[self.user_email],
                           sender=('PronamkaScience', 'defender0508@gmail.com'))
         body = self.standard_message.format(self.post_author, self.post_title,
                                             self.problem_description, self.admin_email)
         message.html = body
         return message
-
-    def _get_user_data(self, user_id: int) -> tuple[str, str]:
-        """Look for the user's email in database using
-        given login."""
-        return self.database.get_information(f'SELECT email, login FROM users WHERE id="{user_id}"')
 
 
 class UserFactory:
