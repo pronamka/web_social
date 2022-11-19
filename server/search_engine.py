@@ -1,15 +1,20 @@
-import os
-
 from PyPDF2 import PdfFileReader, errors, PdfReader
-
-from txtai.embeddings import Embeddings
 
 from server.database import DataBase
 
-"""
-embeddings = Embeddings({"path": "sentence-transformers/all-MiniLM-L6-v2",
-                             "content": True, "objects": True})
-embeddings.load('static/embeddings/full_embeddings')"""
+search_request = "SELECT post_id, raw_text FROM posts WHERE (raw_text LIKE " \
+                 "'{}' OR title LIKE '{}') AND verified=1"
+
+
+def search_post(query: str, limit: int = 5) -> list:
+    query = '%' + query + '%'
+    res = DataBase(database_name='web_social_v4.db').get_all("SELECT post_id, raw_text FROM posts WHERE (raw_text LIKE '{}' OR title LIKE '{}')".format(query, query))
+    if not res:
+        return []
+    res = {i[0]: i[1].count(query) for i in res}
+    res = sorted(res.items(), key=lambda x: x[1], reverse=True)
+    print(res[:limit])
+    return [i[0] for i in res[:limit]]
 
 
 def check_integrity(stream) -> bool:
@@ -28,7 +33,7 @@ def check_integrity(stream) -> bool:
 def get_text(name: str) -> str:
     """Get text from a pdf file saved on disk."""
     print(name)
-    doc = PdfFileReader('static/upload_folder/' + name)
+    doc = PdfFileReader(name)
     text = ''
     for i in doc.pages:
         try:
@@ -38,73 +43,24 @@ def get_text(name: str) -> str:
     return text
 
 
-def search_post(query: str, limit: int = 10) -> list:
-    """Search a certain amount of posts."""
-    result: list = embeddings.search(f'SELECT post_id FROM txtai WHERE '
-                                     f'SIMILAR("{query}") AND score>=0.15', limit=limit)
-    return result
-
-
-def add_article_to_search(title: str, post_id: int) -> None:
-    """Add an article that is already saved on disk to
-    the search-system database."""
-    embeddings.upsert([(embeddings.count(), {'post_id': post_id,
-                                             'text': get_text(title)}, None)])
-    embeddings.save('static/embeddings')
-
-
-def remove_article_from_search(post_id: int) -> None:
-    """Remove an article from search-system database."""
-    article_id = embeddings.search(f'SELECT id FROM txtai WHERE post_id="{post_id}"')
-    embeddings.delete([article_id[0].get('id')])
-    embeddings.save('static/embeddings')
-
-
 class SearchManagerTools:
-    database = DataBase(database_name='web_social_v3.db')
-
-    @staticmethod
-    def clear_search():
-        embeddings.delete([i for i in range(embeddings.count())])
-        embeddings.close()
-        for i in os.listdir('static/embeddings'):
-            os.remove('static/embeddings/' + i)
+    database = DataBase(database_name='web_social_v4.db', access_level=4)
 
     def write_all_documents(self):
-
         all_articles = self.database.get_all('SELECT post_id, title FROM posts')
-        data_package = []
         excluded_files = []
-        for n, i in enumerate(all_articles):
+        for i in all_articles:
             try:
-                data_package.append((n, {'post_id': i[0], 'text': get_text(i[1])}, None))
+                text = get_text(i[1]).replace('"', '')
+                text = text.replace(chr(0), '')
+                self.database.update(f'''UPDATE posts SET text=QUOTE("{text}") WHERE post_id={i[0]}''')
             except errors.PdfReadError:
                 excluded_files.append(i)
                 print('File corrupted: ' + i[1])
-                DataBase(access_level=3).update(f'UPDATE posts SET verified=3 WHERE post_id={i[0]}')
-        embeddings.index(data_package)
-        embeddings.save('static/embeddings/full_embeddings')
-
-    def write_short_embeddings(self):
-        all_articles = self.database.get_all('SELECT post_id, title FROM posts')
-        data_package = []
-        excluded_files = []
-        for n, i in enumerate(all_articles):
-            if n > 40:
-                break
-            try:
-                data_package.append((n, {'post_id': i[0], 'text': get_text(i[1])}, None))
-            except errors.PdfReadError:
-                excluded_files.append(i)
-                print('File corrupted: ' + i[1])
-                DataBase(access_level=3).update(f'UPDATE posts SET verified=3 WHERE post_id={i[0]}')
-        embeddings.index(data_package)
-        embeddings.save('static/embeddings')
+                self.database.update(f'UPDATE posts SET verified=3 WHERE post_id={i[0]}')
+        print(excluded_files)
 
 
-"""
 if __name__ == '__main__':
-    embeddings = Embeddings({"path": "sentence-transformers/all-MiniLM-L6-v2",
-                             "content": True, "objects": True})
-    embeddings.load('static/embeddings/full_embeddings')"""
-
+    while True:
+        print(search_post(input('Search: '), 10))
