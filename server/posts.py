@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Union
+from datetime import datetime, timedelta
 import os
 
 from server.database import DataBase
@@ -81,10 +82,18 @@ class Comment:
     :param comment_id: integer representing an id of a comment that should be presented"""
     database = DataBase()
 
-    def __init__(self, comment_id: int):
+    def __init__(self, comment_id: int, with_replies: bool = False):
         self.comment_id = comment_id
         self.post_id, self.user_id, self.text, self.date = self._get_properties()
         self.author = self._get_by_id()
+        self.made_ago = str(datetime.now() - datetime.strptime(self.date, '%A, %d. %B %Y %H:%M')).split(', ', 1)[0]
+        if with_replies:
+            self.replies_amount = self._fetch_replies_amount()
+
+    def _fetch_replies_amount(self) -> int:
+        has_replies = self.database.get_information(f"SELECT COUNT(post_id) FROM comments "
+                                                    f"WHERE is_reply={self.comment_id}")
+        return has_replies if has_replies else 0
 
     def _get_properties(self) -> tuple:
         return self.database.get_information(f'SELECT post_id, user_id, comment, date FROM '
@@ -101,6 +110,10 @@ class Comment:
     def get_text(self) -> str:
         return self.text
 
+    @property
+    def get_replies_amount(self):
+        return self.replies_amount
+
     def __repr__(self) -> str:
         parameters_string = ''
         for attr in self.__dict__.items():
@@ -110,58 +123,31 @@ class Comment:
 
 
 class CommentsRegistry:
-    """Registry that keeps record of all comments of a post."""
     database = DataBase()
+    base_request = 'SELECT comment_id FROM comments WHERE status!=3 AND {conditions} ' \
+                   'ORDER BY comment_id DESC LIMIT {amount} OFFSET {start_with}'
 
-    def __init__(self, post_id: int) -> None:
-        self.post_id = post_id
-        self.comments = {}
-        self.counter = 0
-        self.fetch_comments(5)
+    comments_request = "WITH post_ids AS (SELECT post_id FROM posts WHERE verified!=2 AND user_id={of_user} " \
+                       "ORDER BY post_id DESC) SELECT comment_id FROM comments " \
+                       "WHERE post_id IN post_ids AND status!=3 AND is_reply==0 ORDER BY " \
+                       "comment_id DESC LIMIT {amount} OFFSET {start_with}"
 
-    def fetch_comments(self, amount: int) -> None:
-        res = self.database.get_all_singles(f'SELECT comment_id FROM comments '
-                                            f'WHERE post_id="{self.post_id}"'
-                                            f' ORDER BY comment_id DESC LIMIT {amount} '
-                                            f'OFFSET {self.counter}')
-        for i in res:
-            self.comments[self.counter] = Comment(i)
-            self.counter += 1
+    objects = {'comment': 'post_id={} AND is_reply=0', 'reply': 'is_reply={}'}
 
-    def get_latest_comments(self, amount: int, start_with: int) -> tuple:
-        """Get available_comment defined amount of user's posts starting from the latest one."""
-        if available_comments := self._check_comments_sufficiency(amount, start_with):
-            comments = tuple(self.comments.values())[start_with:available_comments + start_with]
-            return comments
+    @classmethod
+    def fetch_(cls, object_type: str, object_id: int,
+               amount: int, start_with: int):
+        conditions = cls.objects.get(object_type, '').format(object_id)
+        request = cls.base_request.format(conditions=conditions, amount=amount,
+                                          start_with=start_with)
+        return [Comment(i, True) for i in cls.database.get_all_singles(request)]
 
-    def _check_comments_sufficiency(self, amount: int, start_with: int) -> Optional[int]:
-        """Check if there is enough posts to return.
-        If not, attempt will be made to load some new ones.
-        If there is still not enough to return even one None will be returned."""
-        if (overall_amount := amount + start_with) > self.counter:
-            self.fetch_comments(overall_amount - self.counter)
-        if (comments_available := (self.counter - amount)) <= 0 and start_with > self.counter:
-            return
-        elif start_with < self.counter and comments_available <= 0:
-            return self.counter - start_with
-        elif overall_amount > self.counter and overall_amount > 0:
-            return overall_amount
-        else:
-            return amount
-
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> Comment:
-        if self.counter >= len(self.comments):
-            self.counter = 0
-            raise StopIteration
-        else:
-            self.counter += 1
-            return list(self.comments.values())[self.counter - 1]
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}(post_id={self.post_id}, comments={self.comments})'
+    @classmethod
+    def fetch_comments_on_users_post(cls, amount: int, start_with: int, of_user: int):
+        formatted_request = cls.comments_request.format(of_user=of_user,
+                                                        amount=amount, start_with=start_with)
+        res = cls.database.get_all_singles(formatted_request)
+        return [Comment(i) for i in res]
 
 
 class FullyFeaturedPost(PostForDisplay):
@@ -177,8 +163,8 @@ class FullyFeaturedPost(PostForDisplay):
                                              f'users WHERE login="{self.get_author}"')[0]
 
     def _get_author_avatar(self):
-        if os.path.exists('static/avatar_images/'+str(self.get_author_id)+'.jpeg'):
-            return 'avatar_images/'+str(self.get_author_id)+'.jpeg'
+        if os.path.exists('static/avatar_images/' + str(self.get_author_id) + '.jpeg'):
+            return 'avatar_images/' + str(self.get_author_id) + '.jpeg'
         else:
             return 'avatar_images/0.jpeg'
 
@@ -207,34 +193,45 @@ class PostRegistry(ABC):
 
 
 class UserPostRegistry(PostRegistry):
+    default_request = 'SELECT post_id FROM posts {conditions} ORDER BY post_id ' \
+                      'DESC LIMIT {amount} OFFSET {start_with}'
 
     @classmethod
-    def get_posts(cls,
-                  amount: int,
-                  start_with: int,
-                  author_id: int = None,
+    def get_posts(cls, amount: int, start_with: int,
+                  parameters: dict = None, retrieve: str = 'post',
                   post_type: [PostForDisplay, FullyFeaturedPost] = PostForDisplay):
         """This method was described in the parent class."""
-        if not author_id:
-            data = cls.database.get_all_singles(f'SELECT post_id FROM posts ORDER BY '
-                                                f'post_id DESC LIMIT {amount} OFFSET {start_with}')
-        else:
-            data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE user_id="{author_id}" ORDER BY '
-                                                f'post_id DESC LIMIT {amount} OFFSET {start_with}')
-        posts = [post_type(post_id) for post_id in data]
-        return posts
+        request = cls.default_request.format(conditions=cls.process_conditions(parameters),
+                                             amount=amount, start_with=start_with)
+        ids = cls.database.get_all_singles(request)
+        if retrieve == 'post':
+            return [post_type(post_id) for post_id in ids]
+        elif retrieve == 'id':
+            return list(ids)
+
+    @staticmethod
+    def process_conditions(parameters):
+        if not parameters:
+            return ''
+        params = {'of_user': 'user_id={}', 'verified': 'verified==1',
+                  'from_subscriptions': 'user_id IN {}'}
+        conditions = 'WHERE '
+
+        for iteration, item in enumerate(parameters.items()):
+            conditions += params.get(item[0]).format(item[1])
+            if iteration < len(parameters) - 1:
+                conditions += ' AND '
+        return conditions
 
     @classmethod
-    def get_subscription_posts(cls, date: str, follows: tuple[int]):
+    def get_subscription_posts(cls, follows: tuple, amount: int, start_with: int):
         """Get posts of some users on a specific date.
-        :param date: a string in format 'YYYY-MM-DD'
         :param follows: a tuple with id's of users, whose posts are needed."""
         if len(follows) == 1:
             follows = (0, follows[0])
-        data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE user_id IN {follows} '
-                                            f'AND date="{date}"')
-        posts = [PostForDisplay(post_id) for post_id in data]
-        return posts
+        data = cls.database.get_all(f'SELECT post_id, date FROM posts WHERE user_id IN {follows} '
+                                            f'ORDER BY post_id DESC LIMIT {amount} OFFSET {start_with}')
+        return [{i[1]: PostForDisplay(i[0])} for i in data]
 
     @classmethod
     def get_posts_from_ids(cls, post_ids: list,
@@ -251,10 +248,6 @@ class AdminPostRegistry(PostRegistry):
         """The only difference between this method and
         get_posts method of UserPostRegistry is that here
         FullyFeaturedPost is yielded instead of PostForDisplay."""
-        counter = 0
         data = cls.database.get_all_singles(f'SELECT post_id FROM posts WHERE verified="0" ORDER BY '
-                                            f'post_id DESC LIMIT {amount} OFFSET {start_with}')
-        posts = [FullyFeaturedPost(post_id) for post_id in data]
-        while counter < len(posts):
-            yield posts[counter]
-            counter += 1
+                                            f'post_id LIMIT {amount} OFFSET {start_with}')
+        return [FullyFeaturedPost(post_id) for post_id in data]
