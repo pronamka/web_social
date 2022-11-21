@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Union
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 
 from server.database import DataBase
@@ -199,7 +199,7 @@ class UserPostRegistry(PostRegistry):
     @classmethod
     def get_posts(cls, amount: int, start_with: int,
                   parameters: dict = None, retrieve: str = 'post',
-                  post_type: [PostForDisplay, FullyFeaturedPost] = PostForDisplay):
+                  post_type: [PostForDisplay, FullyFeaturedPost] = PostForDisplay) -> list:
         """This method was described in the parent class."""
         request = cls.default_request.format(conditions=cls.process_conditions(parameters),
                                              amount=amount, start_with=start_with)
@@ -210,7 +210,7 @@ class UserPostRegistry(PostRegistry):
             return list(ids)
 
     @staticmethod
-    def process_conditions(parameters):
+    def process_conditions(parameters: dict) -> str:
         if not parameters:
             return ''
         params = {'of_user': 'user_id={}', 'verified': 'verified==1',
@@ -224,18 +224,21 @@ class UserPostRegistry(PostRegistry):
         return conditions
 
     @classmethod
-    def get_subscription_posts(cls, follows: tuple, amount: int, start_with: int):
+    def get_subscription_posts(cls, follows: tuple, amount: int, start_with: int) -> list[dict]:
         """Get posts of some users on a specific date.
-        :param follows: a tuple with id's of users, whose posts are needed."""
+        :param follows: a tuple with id's of users, whose posts are needed.
+        :param amount: the amount of posts required.
+        :param start_with: the amount of posts that will be excluded
+                           from the output"""
         if len(follows) == 1:
             follows = (0, follows[0])
         data = cls.database.get_all(f'SELECT post_id, date FROM posts WHERE user_id IN {follows} '
-                                            f'ORDER BY post_id DESC LIMIT {amount} OFFSET {start_with}')
+                                    f'ORDER BY post_id DESC LIMIT {amount} OFFSET {start_with}')
         return [{i[1]: PostForDisplay(i[0])} for i in data]
 
     @classmethod
     def get_posts_from_ids(cls, post_ids: list,
-                           post_type: Union[PostForDisplay, FullyFeaturedPost] = PostForDisplay):
+                           post_type: Union[PostForDisplay, FullyFeaturedPost] = PostForDisplay) -> list:
         """Get objects of a specific type (default PostForDisplay), that contains
         information about the post, by their ids."""
         return [post_type(i) for i in post_ids]
@@ -244,7 +247,7 @@ class UserPostRegistry(PostRegistry):
 class AdminPostRegistry(PostRegistry):
 
     @classmethod
-    def get_posts(cls, amount: int, start_with: int):
+    def get_posts(cls, amount: int, start_with: int) -> list:
         """The only difference between this method and
         get_posts method of UserPostRegistry is that here
         FullyFeaturedPost is yielded instead of PostForDisplay."""
