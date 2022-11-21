@@ -1,8 +1,58 @@
+// function now() and throttle() (that used here for 
+// sending request properly (to avoid sending to many at)
+// once) are taken from https://github.com/jashkenas/underscore.git
+
+function now() {
+    return new Date().getTime();
+};
+
+function throttle(func, wait, options) {
+    var timeout, context, args, result;
+    var previous = 0;
+    if (!options) options = {};
+  
+    var later = function() {
+      previous = options.leading === false ? 0 : now();
+      timeout = null;
+      result = func.apply(context, args);
+      if (!timeout) context = args = null;
+    };
+  
+    var throttled = function() {
+      var _now = now();
+      if (!previous && options.leading === false) previous = _now;
+      var remaining = wait - (_now - previous);
+      context = this;
+      args = arguments;
+      if (remaining <= 0 || remaining > wait) {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+        previous = _now;
+        result = func.apply(context, args);
+        if (!timeout) context = args = null;
+      } else if (!timeout && options.trailing !== false) {
+        timeout = setTimeout(later, remaining);
+      }
+      return result;
+    };
+  
+    throttled.cancel = function() {
+      clearTimeout(timeout);
+      previous = 0;
+      timeout = context = args = null;
+    };
+  
+    return throttled;
+  }
+
+
 const request_url = '/admin_get_posts/'
 var posts = {}
 var extension_amount = 0
 
-document.addEventListener('DOMContentLoaded', getPosts(2));
+document.addEventListener('DOMContentLoaded', getPosts(2), {once: true});
 
 
 function sendRequest(method, url, body) {
@@ -15,13 +65,14 @@ function sendRequest(method, url, body) {
     })
 }
 
-function getPosts(amount){
+function getPosts(amount, with_reduced_offset=false){
+    if (with_reduced_offset == true){
+        extension_amount -= 1
+    }
     sendRequest('POST', request_url, 
     {'posts_loaded': extension_amount, 'posts_required': amount}).then(resp => {
         post_json = JSON.parse(resp)
-        console.log(extension_amount)
         extension_amount += amount
-        console.log(extension_amount)
         buildPosts(post_json);
     })
 }
@@ -69,11 +120,10 @@ function verify_post(post_id){
     sendRequest('POST', '/admin/verify_post/', {'post_id': post_id}).then(resp => {
         const verified_post = document.getElementById(post_id)
         verified_post.remove()
-        getPosts(1)
+        getPosts(1, true)
     }
     )
 }
-
 
 function addPost(html) {
     const tab = document.getElementById('posts_table');
@@ -83,8 +133,15 @@ function addPost(html) {
     tab.appendChild(template.content);
     return template.content.firstChild;
 }
-window.addEventListener("scroll", function(event) {
+function load(){
+    document.removeEventListener("scroll", load);
+    setTimeout(load_on_scroll, '1000');
+    document.addEventListener("scroll", load);
+}
+var load_on_scroll = function(event) {
+    
     if ((window.innerHeight+window.scrollY) >= document.body.offsetHeight-100){
+        console.log('called')
         getPosts(2);
-    } 
-}, false);
+    } }
+document.addEventListener("scroll", throttle(load_on_scroll, 100));
