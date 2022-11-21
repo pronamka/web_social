@@ -210,7 +210,7 @@ class InformationGetter:
                              self.parameters.get('comments_loaded')
         return self.user.PostManager.get_latest_comments(amount, start_with)
 
-    def get_latest_posts(self) -> Union[int, tuple[FullyFeaturedPost]]:
+    def get_latest_posts(self) -> Union[int, tuple[FullyFeaturedPost], list[FullyFeaturedPost]]:
         amount, start_with, of_user = self.parameters.get('posts_required', 1), \
                                       self.parameters.get('posts_loaded', 0), \
                                       self.parameters.get('of_user', True)
@@ -257,7 +257,7 @@ class InformationLoader:
                     'post_amount': 'object',
                     'subscribers': 'amount'},
             'content': {'latest_posts': 'object'},
-            'comment_section': {'latest_comments_dev': 'object'},}
+            'comment_section': {'latest_comments_dev': 'object'}, }
         data = InformationGetter(protocols.get(params.get('page')),
                                  parameters=params).get_full_data()
         return dumps(data, cls=Encoder)
@@ -408,7 +408,8 @@ class RegistrationHandler:
     def _create_in_db(self) -> None:
         """Creates the row in database containing user data."""
         user_data = self._build_data_package()
-        query = f"INSERT INTO users (login, password, email, registration_date) VALUES (?, ?, ?, ?);"
+        query = "INSERT INTO users(login, password, email, registration_date) VALUES (?, ?, ?, ?);"
+        # connect('web_social_v4.db').cursor().execute(query, user_data)
         self.database.insert(query, data=user_data)
 
     def _build_data_package(self) -> tuple:
@@ -481,8 +482,8 @@ class EmailSenderWithToken(ABC):
 
     def _get_by_email(self) -> int:
         """Get user id from login."""
-        return self.database.get_information(f"SELECT id FROM users WHERE email="
-                                             f"'{self.email_address}'", default=(None,))[0]
+        return DataBase().get_information(f"SELECT id FROM users WHERE email="
+                                          f"'{self.email_address}'")[0]
 
 
 class EmailConfirmationHandler(EmailSenderWithToken):
@@ -506,7 +507,7 @@ class EmailConfirmationHandler(EmailSenderWithToken):
         if (user_id := Token.check_token(token)) is False:
             return 'The link is either wrong or expired.'
         else:
-            DataBase(access_level=3).update(f'''UPDATE users SET status="1" WHERE id="{user_id}"''')
+            DataBase(access_level=3).update(f'UPDATE users SET status=1 WHERE id={user_id}')
             return 'Your account is confirmed, thanks. You can now close this page.'
 
     def _create_email(self) -> Message:
