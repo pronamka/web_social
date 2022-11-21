@@ -8,7 +8,7 @@ search_request = "SELECT post_id, raw_text FROM posts WHERE (raw_text LIKE " \
 
 def search_post(query: str, limit: int = 5) -> list:
     query = '%' + query + '%'
-    res = DataBase(database_name='web_social_v4.db').get_all("SELECT post_id, raw_text FROM posts WHERE (raw_text LIKE '{}' OR title LIKE '{}')".format(query, query))
+    res = DataBase(database_name='web_social_v4.db').get_all(search_request.format(query, query))
     if not res:
         return []
     res = {i[0]: i[1].count(query) for i in res}
