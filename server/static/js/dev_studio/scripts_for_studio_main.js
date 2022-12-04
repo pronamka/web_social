@@ -10,6 +10,8 @@ const content_page = {'page': 'content', 'posts_loaded': 0, 'posts_required': 2,
 const comments_page = {'page': 'comment_section', 'comments_loaded': 0, 'comments_required': 10}
 const btn_upload_files = document.querySelector('btn-upload-files');
 const comments_with_replies = {}
+var article_upload_tags = {}
+var chosen_tags_plain = {}
 
 document.addEventListener('DOMContentLoaded', loadHub());
 
@@ -288,11 +290,142 @@ function uploadArticle(){
     const file_article = new FormData()
     file_article.append('file', file_data)
     file_article.append('filename', file_data['name'])
+    file_article.append('tags', JSON.stringify(article_upload_tags))
+    console.log(file_article)
     fetch('/upload_file/', {method: 'POST', body: file_article, 
     headers: {'Accept': 'application/json'}}).then(response=>response.text()).then(resp=>{
         console.log(resp)
         alert(resp)
     })
+}
+
+function getParent(key){
+    console.log(key)
+    var elem = document.getElementById(key)
+    var child_of = elem.getAttribute('child_of')
+    return child_of
+}
+function getFullInheritanceTree(key){
+    var elem = document.getElementById(key)
+    var child_of = elem.getAttribute('child_of')
+    var tree = {}
+    s = {}
+    s[key] = {}
+    if (child_of=="All interests"){
+        return s
+    }
+    tree[child_of] = s
+    while (true){
+        var parent = getParent(child_of)
+        if (parent == 'All interests'){
+            return tree
+        }
+        var s = tree
+        tree = {}
+        tree[parent] = s
+        child_of = parent
+    }
+}
+
+function flatten(interest_tree_dict){
+    var keys = Object.keys(interest_tree_dict)
+    var result = {}
+    for (var i=0, l=keys.length; i<l; i++){
+        result[keys[i]] = {}
+        if (interest_tree_dict[keys[i]].length != 0){
+            result = Object.assign({}, result, flatten(interest_tree_dict[keys[i]]))
+        }
+    }
+    return result
+}
+function searchAndInsert(interest_tree, user_tree){
+    var interest = Object.keys(interest_tree)[0]
+    chosen_tags_plain[interest] = {}
+    if (interest in user_tree){
+        user_tree[interest] = searchAndInsert(interest_tree[interest], user_tree[interest])
+        return user_tree
+    }
+    else{
+        var further_interests = interest_tree[interest]
+        if (further_interests == null){
+            further_interests = {}
+        }
+        user_tree[interest] = further_interests
+        return user_tree
+    }
+}
+function searchAndDelete(interest_tree, user_tree){
+    var interest = Object.keys(interest_tree)[0]
+    debugger
+    if (Object.keys(interest_tree[interest]).length != 0){
+        user_tree[interest] = searchAndDelete(interest_tree[interest], user_tree[interest])
+        return user_tree
+    }
+    else{
+        var s = flatten(user_tree[interest])
+        for (i in s){
+            delete chosen_tags_plain[i]
+        }
+        delete user_tree[interest]
+        delete chosen_tags_plain[interest]
+        return user_tree
+    }
+}
+function changeStatus(key){
+    var details = document.getElementById(`details ${key}`)
+    if (details){
+        if (details.open){
+            details.open = false
+        }
+        else{
+            details.open = true
+        }
+    }
+    elem = document.getElementById(`${key}`)
+    const tree = getFullInheritanceTree(key)
+    var mark = document.getElementById(`interests_chosen_mark ${key}`)
+    if (key in chosen_tags_plain) {
+        article_upload_tags = searchAndDelete(tree, article_upload_tags)
+        elem.setAttribute('class', 'interests unselected')
+        mark.innerHTML = '&#x2717;'
+    }
+    else{
+        article_upload_tags = searchAndInsert(tree, article_upload_tags)
+        interests_plain = Object.assign({}, chosen_tags_plain, flatten(article_upload_tags))
+        elem.setAttribute('class', 'interests selected')
+        mark.innerHTML = '&#x2713;'
+    }
+}
+function getIndex(interest){
+    var mark = `<p onclick="changeStatus('${interest}')" id="interests_chosen_mark ${interest}" style="display: inline-block; font-size: 16;">`
+    var index = 'class="interests unselected"'
+    mark += '&#x2717;</p>'
+    return [index, mark]
+}
+
+function displayInterests(interests, summary_name='Your interests', with_indexing=false, add_to_chosen=true, summary_index=['', ''], child_of=''){
+    html = `<details id="details ${summary_name}"><summary id="${summary_name}" ${summary_index[0]} child_of="${child_of}">${summary_name}${summary_index[1]}</summary><ul>`
+    for (const key in interests){
+        
+        if (Object.keys(interests[key]).length == 0){
+            var index_and_mark = getIndex(key)
+            html += `<li id="${key}" ${index_and_mark[0]} child_of="${summary_name}">${key}${index_and_mark[1]}</li>`
+        }
+        else if(typeof interests[key] == 'object'){
+            summary_index = getIndex(key)
+            html += displayInterests(interests[key], key, with_indexing, add_to_chosen, summary_index, summary_name)
+        }
+    }
+    html += `</ul></details>`
+    return html
+}
+
+
+function loadAllInterests(){
+    sendRequest('POST', '/load_info/', {'page': 'personal_data', 'all_interests': true}).then(resp => {
+        html = displayInterests(JSON.parse(resp)['interests'], 'All interests', true, false)
+        insertHTML('#all_interests', html)
+    })    
 }
 
 nav_tabs.forEach(tab => {
