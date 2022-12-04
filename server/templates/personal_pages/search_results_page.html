@@ -4,14 +4,17 @@
 <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
 <meta name="viewport" content="width=device-width">
 <main role="main">
+    <dialog id="add_to_search"></dialog>
     <article>
+        <p id="searched_for"></p>
         <div id="search_results"></div>
         <button onclick="search_new()" id="more_posts_btn">More results</button>
     </article>
 </main>
 <script>
     const settings = {'search_query': '{{search_query}}', 
-    'results_required': 5, 'results_recieved': 0}
+    'results_required': 5, 'results_received': 0, 
+    'search_strictly': '{{search_strictly}}'}
     document.addEventListener('DOMContentLoaded', search_new())
 
     function sendRequest(method, url, body) {
@@ -23,19 +26,44 @@
             return response.text()
         })
     }
+
+    function search_strictly(query){
+        var dialog = document.getElementById('add_to_search')
+        var html = `<p>We autocorrected your query, because we 
+            do not have words you used in our dictionary. If you spelled
+            the word right, and would like to add it to the dictionary, 
+            please, click the button below.</p>
+                <button onclick="window.location.replace('/search_page?query=${query}&search_strictly=1&add_to_search=1')">Add to our dictionary and search</button>
+                 <button onclick="window.location.replace('/search_page?query=${query}&search_strictly=1')">Search without adding</button>`
+        dialog.innerHTML = html
+        dialog.showModal()
+    }
     
     function search_new(){
         sendRequest('POST', '/search/', settings).then(resp=>{
             var posts=JSON.parse(resp)
-            if (posts.length == 0){
+            console.log(posts['searched_for'])
+            if ((posts['search_results'].length == 0) && (posts['searched_for'] == settings['search_query'])) {
+                addPost('<h2>No results</h2>')
+                document.getElementById('more_posts_btn').remove()
+                return false
+            }
+            if (posts['search_results'].length == 0){
                 addPost('<h2>No results</h2>')
                 document.getElementById('more_posts_btn').remove()
             }
-            else{
-                settings['results_recieved'] += posts.length
-                buildPosts(posts)}
-        })
-    }
+            console.log(settings['results_received'] == 0)
+            if ((posts['searched_for'] != settings['search_query']) | 
+            (settings['results_received'] == 0) ) {
+                console.log('in')
+                document.getElementById('searched_for').innerHTML = 
+                `Showing results for ${posts['searched_for']}. 
+                <a onclick="sendRequest(search_strictly('${settings['search_query']}'))">
+                    Search ${settings['search_query']}</a>`
+            }
+            settings['results_received'] += posts['search_results'].length
+            buildPosts(posts['search_results'])})
+        }
         
     function buildPosts(post_dict){
         for (var i=0, l=Object.keys(post_dict).length-1; i<=l; i++){
