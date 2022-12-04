@@ -1,5 +1,6 @@
 import re
 from collections import Counter
+from ast import literal_eval
 
 from PyPDF2 import PdfFileReader, errors, PdfReader
 from server.database import DataBase
@@ -78,7 +79,7 @@ class SpellingCorrector:
 
 
 class Searcher:
-    search_request = "SELECT post_id, raw_text FROM posts WHERE (raw_text LIKE " \
+    search_request = "SELECT post_id, tags, raw_text FROM posts WHERE (raw_text LIKE " \
                      "'{}' OR title LIKE '{}') AND verified=1"
     corrector = SpellingCorrector()
     database = DataBase()
@@ -89,9 +90,9 @@ class Searcher:
         res = cls.database.get_all(cls.search_request.format(sql_query, sql_query))
         if not res:
             return []
-        res = {i[0]: cls.count_appearances(query, i[1]) for i in res}
-        res = sorted(res.items(), key=lambda x: x[1], reverse=True)
-        return [i[0] for i in res[:limit]]
+        res = {i[0]: (i[1], cls.count_appearances(query, i[2])) for i in res}
+        res = sorted(res.items(), key=lambda x: x[1][1], reverse=True)
+        return [(i[0], i[1][0]) for i in res[:limit]]
 
     @staticmethod
     def count_appearances(word, text):
@@ -100,6 +101,30 @@ class Searcher:
             if word in i:
                 count += 1
         return count
+
+    @classmethod
+    def search(cls, query: str, limit: int = 5, start_with: int = 0, strictly: bool = False, interests: set = None) -> tuple:
+        modified_request = ''
+        results = []
+        for i in words if (words := query.split(' ')) and strictly else cls._get_corrections(words):
+            modified_request += i + ' '
+            results += cls._search_one(i, limit + start_with)
+        best_results = [i[0] for i in Counter(results).most_common(start_with + limit)[start_with:]]
+        return cls.compare_with_interests(interests, best_results), modified_request.strip()
+
+    @classmethod
+    def compare_with_interests(cls, interests: set, posts: list):
+        res = {i[0]: 0 for i in posts}
+        for i in posts:
+            if i[1]:
+                intersection = literal_eval(i[1]).intersection(interests)
+                res[i[0]] += len(intersection)
+        return sorted(res.items(), key=lambda x: x[1], reverse=True)
+
+    @classmethod
+    def _get_corrections(cls, words: list):
+        for i in words:
+            yield cls.corrector.edit_spelling(i)
 
     @classmethod
     def search_post(cls, query: str, limit: int = 5, start_with: int = 0, strictly: bool = False) -> tuple:
