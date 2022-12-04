@@ -14,7 +14,8 @@
         <nav class="nav">
             <label for="nav-toggle" class="nav-toggle" onclick id="open_tab_lb"></label>
             <h2 class="logo">{{session.get('login')}}</h2>
-            <img src="{{ url_for('static', filename= '/avatar_images/' + session.get('id') + '.jpeg') }}" class="avatar">
+
+            <div id="user_avatar_pic_img"></div>
             <p id="status">Status: online</p>
             <form action="/log_out" method="get" id="log_out_block">
                 <button type="submit" name="log_out" width="100px">Log out</button>
@@ -27,12 +28,12 @@
                     </button>
                 </li>
                 <li>
-                    <button onclick="window.location.href='/subscriptions/'" id="go_to_subscriptions_page">
+                    <button onclick="window.location.href='/subscriptions/'" id="go_to subscriptions_page">
                         Subscriptions
                     </button>
                 </li>
                 <li>
-                    <button onclick="window.location.href=`{{ url_for('personal_page')}}`">
+                    <button onclick="window.location.href=`/private_page/`" id="go_to private_page">
                         Personalization
                     </button>
                 </li>
