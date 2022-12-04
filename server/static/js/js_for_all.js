@@ -1,3 +1,4 @@
+document.addEventListener('DOMContentLoaded', loadAvatar())
 function sendRequest(method, url, body) {
     const headers = {'Content-Type': 'application/json'}
     console.log(body)
@@ -8,7 +9,12 @@ function sendRequest(method, url, body) {
         return response.text()
     })
 }
-
+function loadAvatar(){
+    sendRequest('POST', '/load_info/', {'page': 'personal_data'}).then(resp =>{
+        console.log(resp['avatar'])
+        document.getElementById('user_avatar_pic_img').innerHTML = `<img src="${JSON.parse(resp)['avatar']}" class="avatar"></img>`
+    })
+}
 function search(){
     var query = document.getElementById('search_query').value
     window.location.replace('/search_page?query='+query)
