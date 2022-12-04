@@ -57,7 +57,7 @@ function logIn(){
             validation_errors.innerHTML = 'Wrong credentials.'
         }
         else if (status == 409){
-            document.getElementById('warning_message').innerHTML = "You are already logged in as"+ response['logged_as'] +" <br>Log in anyways? (Your previous session will be closed)"
+            document.getElementById('warning_message').innerHTML = "You are already logged in as "+ response['logged_as'] +" <br>Log in anyways? (Your previous session will be closed)"
             already_logged_in_dlg.showModal()
         }
         else if (status == 412){
