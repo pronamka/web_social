@@ -2,6 +2,7 @@ import os
 from enum import Enum
 from abc import ABC, abstractmethod
 from typing import Union, Optional
+from ast import literal_eval
 
 from flask_login import UserMixin
 from flask_mail import Mail, Message
@@ -24,13 +25,18 @@ class User(UserMixin, ABC):
     :param data: a tuple of 5 (id, login, email_address, registration_date, status)"""
 
     def __init__(self, data: tuple) -> None:
-        self.user_id, self.login, self.email_address, self.register_date, self.status = data
+        self.user_id, self.login, self.email_address, self.register_date, self.status = data[:5]
+        self.interests: dict = literal_eval(data[-1])
         self.SubscriptionManager = UserSubscriptionManager(self.user_id)
         self.avatar = self._get_avatar()
 
+    def update_interests(self, interests):
+        DataBase(access_level=3).update(f'UPDATE users SET interests="{interests}" WHERE id={self.user_id}')
+        self.interests = interests
+
     def _get_avatar(self):
-        return path if os.path.exists((path := f'static/avatar_images/{self.user_id}.jpeg')) \
-            else 'static/avatar_images/0.jpeg'
+        return '/'+path if os.path.exists((path := f'static/avatar_images/{self.user_id}.jpeg')) \
+            else '/static/avatar_images/0.jpeg'
 
     @property
     def get_user_id(self):
@@ -59,6 +65,10 @@ class User(UserMixin, ABC):
             return False
         else:
             return True
+
+    @property
+    def get_interests(self):
+        return self.interests
 
     def get_id(self):
         try:
@@ -276,7 +286,7 @@ class UserFactory:
 
     @classmethod
     def _get_data(cls, user_id: int) -> tuple:
-        data = cls.database.get_information(f"SELECT id, login, email, registration_date, status "
+        data = cls.database.get_information(f"SELECT id, login, email, registration_date, status, interests "
                                             f"FROM users WHERE id='{user_id}'")
         assert data is not None, 'User with given id does not exist. If you encountered this error, ' \
                                  'please contact us at defender0508@gmeail.com'
