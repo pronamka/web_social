@@ -64,6 +64,14 @@
 <main role="main">
     <article>
         <div class="tab-content">
+            <dialog id="upload_article_dlg">
+                <h2>Upload an article</h2>
+                <div id="upload_article">
+                    <input type="file" name="file" placeholder="Select a file" id="inp-file-content">
+                    <button name="send_file" onclick="uploadArticle()" id="send_article_btn">Post</button>
+                </div>
+                <div id="all_interests"></div>
+            </dialog>
             <div class="tabs__tab  active" id="hub" data-tab-info>
                 <h2>Content-creatror account managment pannel.</h2>
                 <div id="last_post">
@@ -77,10 +85,7 @@
 
             <div class="tabs__tab" id="content" data-tab-info>
                 <h2>Your posts</h2>
-                <div id="upload_article">
-                    <input type="file" name="file" placeholder="Select a file" id="inp-file-content">
-                    <button name="send_file" placeholder="Post!" onclick="uploadArticle()" id="send_article_btn"></button>
-                </div>
+                <button onclick="document.getElementById('upload_article_dlg').showModal(); loadAllInterests();" id="show_upload_dlg">Upload Article</button>
                 <div id="my_posts"></div>
             </div>
 
@@ -107,7 +112,7 @@
 
             <div class="tabs__tab" id="translations" data-tab-info>
                 <h2>Translations managment pannel</h2>
-                <div id="translations">In development...</div>
+                <div id="translations_dv">In development...</div>
             </div>
 
             <div class="tabs__tab" id="copyright" data-tab-info></div>
