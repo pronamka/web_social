@@ -4,6 +4,8 @@ from docx2pdf import convert
 from pythoncom import CoInitializeEx
 import os
 from typing import Union
+from abc import ABC, abstractmethod
+from io import BytesIO
 
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
@@ -35,21 +37,63 @@ class SymbolsNotAllowed(OSError):
         return self.message
 
 
-class FileManager:
-    """Class for converting/saving docx/pdf files.
-    :param file: FileStorage: a docx/pdf file received from js request.
-    :param user_id: an int - id of a post's author"""
-
-    upload_path = 'static/upload_folder/'
-    wkhtmltopdf_config = configuration(wkhtmltopdf='C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe')
-    wkhtmltopdf_options = {'enable-local-file-access': True}
-
+class FileManager(ABC):
     def __init__(self, file: FileStorage, user_id: int) -> None:
         self.errors = []
         self.file = file  # the file is of type FileStorage, not ImmutableMultiDict
         self.user_id = user_id
         self.filename = self._security_check()
+
+    @abstractmethod
+    def _get_allowed_extensions(self):
+        """Return a tuple of strings representing extensions allowed for
+        the file"""
+
+    @abstractmethod
+    def save(self):
+        """General function for saving files(and converting them into
+        pdf if necessary). Also checks file integrity and uniqueness of
+        its name.
+        :returns: str, if an error occurred; None if file was successfully
+        saved and an entry made in database."""
+
+    def _get_extension(self) -> str:
+        """Get the extension of the file given.
+        :returns: str with the file extension (without '.')"""
+        return self.filename.rsplit('.', 1)[1]
+
+    def _security_check(self):
+        """Check if the file has allowed extension and
+        only numbers and english letters in its name.
+        :returns: str, if the filename is fine; None, if
+        there is something wrong with it. (that way an
+        error will be appended to the error log.)"""
+        filename = self.file.filename
+        chars = list(map(ord, filename))
+        for i in chars:
+            if not (45 <= i <= 57 or 65 <= i <= 122):
+                self.errors.append(SymbolsNotAllowed(filename, chr(i)))
+        if filename.rsplit('.', 1)[1] in self._get_allowed_extensions():
+            return secure_filename(filename)
+        else:
+            self.errors.append(ExtensionNotAllowed(filename))
+
+
+class ArticleManager(FileManager):
+    """Class for converting/saving docx/pdf files.
+    :param file: FileStorage: a docx/pdf file received from js request.
+    :param user_id: an int - id of a post's author"""
+
+    insert_article_request = 'INSERT INTO posts(user_id, title, date, display_date, ' \
+                             'tags, raw_text) VALUES(?, ?, ?, ?, ?, ?);'
+    upload_path = 'static/upload_folder/'
+    wkhtmltopdf_config = configuration(wkhtmltopdf='C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe')
+    wkhtmltopdf_options = {'enable-local-file-access': True}
+
+    def __init__(self, file: FileStorage, user_id: int, tags) -> None:
+        super(ArticleManager, self).__init__(file, user_id)
         self.full_path = None
+        self.tags = tags
         self.protocols = {'pdf': self._immediate_save, 'docx': self._save_from,
                           'html': self._save_from}
 
@@ -69,11 +113,13 @@ class FileManager:
     def _insert_into_db(self) -> None:
         """Creates an entry in the database with the
         information about new post."""
+        DataBase(access_level=2).insert(self.insert_article_request, data=self._build_data_package())
+
+    def _build_data_package(self):
         date = datetime.now()
         data_package = (self.user_id, self._new_filename(False), date.strftime('%Y-%m-%d'),
-                        date.strftime("%A, %d. %B %Y %H:%M"), get_text(self._new_filename()))
-        DataBase(access_level=2).insert(f'INSERT INTO posts(user_id, title, date, display_date, '
-                                        f'raw_text) VALUES(?, ?, ?, ?, ?);', data=data_package)
+                        date.strftime("%A, %d. %B %Y %H:%M"), self.tags, get_text(self._new_filename()))
+        return data_package
 
     def _check_conditions(self) -> Union[str, None]:
         """Check if there is anything wrong with
@@ -86,11 +132,6 @@ class FileManager:
         if DataBase().get_information(f'SELECT title FROM posts WHERE title="{self._new_filename(False)}"'):
             return 'A post with this name already exists, so your file was not saved.' \
                    'Please give it a different name.'
-
-    def _get_extension(self) -> str:
-        """Get the extension of the file given.
-        :returns: str with the file extension (without '.')"""
-        return self.filename.rsplit('.', 1)[1]
 
     def _immediate_save(self) -> str:
         """Just save a file (called when the file already has the right extension)."""
@@ -118,21 +159,8 @@ class FileManager:
         CoInitializeEx(0)
         convert(self.full_path, self._new_filename())
 
-    def _security_check(self) -> Union[str, None]:
-        """Check if the file has allowed extension and
-        only numbers and english letters in its name.
-        :returns: str, if the filename is fine; None, if
-        there is something wrong with it. (that way an
-        error will be appended to the error log.)"""
-        filename = self.file.filename
-        chars = list(map(ord, filename))
-        for i in chars:
-            if not (45 <= i <= 57 or 65 <= i <= 122):
-                self.errors.append(SymbolsNotAllowed(filename, chr(i)))
-        if filename.rsplit('.', 1)[1] in ('docx', 'pdf', 'html'):
-            return secure_filename(filename)
-        else:
-            self.errors.append(ExtensionNotAllowed(filename))
+    def _get_allowed_extensions(self) -> tuple:
+        return 'docx', 'pdf', 'html'
 
     def _new_filename(self, full: bool = True) -> str:
         if not full:
@@ -140,6 +168,22 @@ class FileManager:
         else:
             name = self.full_path
         return name.split('.', maxsplit=1)[0]+'.pdf'
+
+
+class ImageManager(FileManager):
+    def __init__(self, file: FileStorage, user_id: int) -> None:
+        super(ImageManager, self).__init__(file, user_id)
+
+    def _get_allowed_extensions(self):
+        return 'jpeg', 'jpg', 'png'
+
+    def save(self) -> None:
+        """Convert an image from png or jpg to jpeg
+        Saves all files in ../static/avatar_images/"""
+        if self._get_extension() != 'jpeg':  # check if picture already in jpeg format
+            image = Image.open(BytesIO(self.file.read()))  # create an image object
+            jpeg = image.convert('RGB')  # convert image into RGB representation
+            jpeg.save(f'static/avatar_images/{self.user_id}.jpeg')  # save the representation as jpeg
 
 
 def convert_image(name: str) -> None:
