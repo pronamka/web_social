@@ -63,7 +63,8 @@ operations_access_required = {'get_information': AccessLevel(1),
                               'get_all_singles': AccessLevel(1),
                               'insert': AccessLevel(2),
                               'update': AccessLevel(3),
-                              'delete': AccessLevel(4)}
+                              'delete': AccessLevel(4),
+                              'execute_script': AccessLevel(4)}
 
 # it would be much either to describe what actions a certain access level is
 # allowed to do rather than writing the permission level for every operation,
@@ -121,8 +122,15 @@ class DataBase:
         self.access = AccessLevel(access_level)
 
     @safe_execution
+    def execute_script(self, sql: str, *args) -> None:
+        """Execute many commands (that don't retrieve any data e.g. UPDATE/INSERT/DELETE)
+         in one call to the database."""
+        self.cursor.executescript(sql)
+        self.connection.commit()
+
+    @safe_execution
     def get_information(self, sql: str, *args) -> Union[tuple, Any, None]:
-        """Returns a tuple containing one element"""
+        """Get one tuple with any information you need."""
         if result := self.cursor.execute(sql).fetchone():
             return result
         else:
@@ -130,7 +138,7 @@ class DataBase:
 
     @safe_execution
     def get_many(self, sql: str, *args) -> list:
-        """Returns a list containing defined amount of tuples. Default amount= 1."""
+        """Get a list containing defined amount of tuples. Default amount= 1."""
         if args:
             size = args[0].get('size')
         else:
