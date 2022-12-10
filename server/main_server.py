@@ -8,18 +8,24 @@ from flask_login import logout_user
 from server.app_core import app, login_manager, users
 from server.processes import RegistrationHandler, LogInHandler, RestorePasswordNotificationSender, \
     get_user, write_comment, admin_required, login_required, author_required
-from server.utils import UsersObserver, FileManager
+from server.utils import UsersObserver, ArticleManager, ImageManager
 from server.posts import FullyFeaturedPost
 from server.user import UserFactory, UserRole
 from server.processes import search_for
 
-# finish displaying replies on post page
-# finish new search system
+
+# send a notification when post on a certain topic (tracked by a user) gets verified
+# make session live even when user's browser window is closed
+# finish views, likes and analytics
+
+# add a way for users to delete their own posts and comments
 
 # Things that need fixing:
 #   1)User can have two personal page at once by just copy-pasting the link of his page
 #   or logging in as a different person. He might break system for himself in some
 #   cases.
+#   2)When calculating score by word appearances (while searching) only the last word in
+#   the request is counted, so the result can be inaccurate.
 #
 # Add a system of priority when approving posts for admins (some posts will be top
 # priority and examined as quick as possible, while other will have to wait in a queue)
@@ -28,11 +34,7 @@ from server.processes import search_for
 #
 # Add events system for handling registration, log in and other processes.
 #
-# Expand the search system(post tags, interests etc.)
-#
 # Add likes, views.
-#
-# Add session expiry system.
 #
 # Add a way to copyright posts.
 #
@@ -44,17 +46,22 @@ from server.processes import search_for
 #  other user.
 #
 # Load developer studio page:
-#   Sort comments in dev studio by: latest; Made on specific post; seen/verified/liked/replied
+#   Sort comments in dev studio by: Made on specific post; seen/verified/liked/replied
 #   (by author) already.
-#   Add content to fields such as commentaries, analytics, translations, monetization etc.
+#   Add content to fields such as analytics, translations, monetization etc.
 #
 # Post features:
 #   1)Add curse-comment ban system.
-#   2)Add preferences system based on posts tags.
-#
 
 
-Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users conditions
+Thread(target=UsersObserver().check_unconfirmed_users).start()  # tracks users with unconfirmed email
+
+
+def get_request_data(keys: dict, get_from: dict) -> list:
+    data = []
+    for i in keys.keys():
+        data.append(get_from.get(i, keys.get(i)))
+    return data
 
 
 def handle_registration(login: str, password: str, email: str) -> dict:
@@ -83,19 +90,19 @@ def resend_confirmation_email(login: str) -> Response:
 
 @app.route('/registration_page')
 def registration_page() -> Union[Response, str]:
-    """View for displaying the registration page and
-    starting the process of registration."""
+    """View for displaying the registration page."""
     return render_template('registration_page.html')
 
 
 @app.route('/register/', methods=['POST'])
-def register():
-    login, password, email = request.json.values()
+def register() -> dict:
+    """Register a new user."""
+    login, password, email = get_request_data({'login': None, 'password': None, 'email': None}, request.json)
     return handle_registration(login, password, email)
 
 
 @app.route('/log_in/', methods=['GET', 'POST'])
-def log_in():
+def log_in() -> dict:
     """General function for starting the process of logging in."""
     log_in_handler = LogInHandler()
     log_in_handler.log_user()
@@ -111,7 +118,7 @@ def log_in():
 
 @app.route('/log_in_anyways/', methods=['POST'])
 @login_required(session)
-def log_in_anyways():
+def log_in_anyways() -> dict:
     """View for removing the current user session, and starting a
     new one (log in with another account)."""
     log_in_handler = LogInHandler()
@@ -131,7 +138,7 @@ def log_in_page() -> Union[Response, str]:
 @app.route('/admin/examine_post/', methods=['GET', 'POST'],
            endpoint='examine_post')
 @admin_required
-def examine_post():
+def examine_post() -> str:
     """Open a page where a post is displayed, so an admin
     can examine it and ban/verify."""
     post_id = int(request.args.to_dict().get('post_id'))
@@ -141,7 +148,7 @@ def examine_post():
 
 @app.route('/admin/ban_post/', methods=['GET', 'POST'], endpoint='admin_ban_post')
 @admin_required
-def admin_ban_post():
+def admin_ban_post() -> dict:
     """A view for banning a post for admins."""
     post_id, problem_description = request.json.values()
     assert problem_description, 'You did not provide problem description.'
@@ -151,15 +158,15 @@ def admin_ban_post():
 
 @app.route('/admin/verify_post/', methods=['GET', 'POST'], endpoint='admin_verify_post')
 @admin_required
-def admin_verify_post():
+def admin_verify_post() -> dict:
     """A view for verifying a post for admins."""
-    get_user().verify_post(request.json.get('post_id'))
+    get_user().verify_post(request.json.get('post_id'), app)
     return {'status': 'successful'}
 
 
 @app.route('/personal_page', methods=['GET', 'POST'])
 @login_required(session)
-def personal_page():
+def personal_page() -> str:
     """try:
         already_logged_in = session['entries']
     except KeyError:
@@ -172,26 +179,43 @@ def personal_page():
     #  the code in the comment can track if the user already had a page opened and
     #  prevent him from opening a new one, but it is not implemented for the reason that it will
     #  also not let anyone reload their private page.
-    if request.method == 'GET':
-        return render_template('personal_pages/main_page.html')
+    return render_template('personal_pages/main_page.html')
 
 
 @app.route('/subscriptions/')
 @login_required(session)
-def subscribed_to_posts():
+def subscribed_to_posts() -> str:
     """Open a page where the posts of the people user is subscribed to
     are going to be displayed. The posts themselves are loaded later
     by js fetch request."""
     return render_template('personal_pages/subscriptions_page.html')
 
 
+@app.route('/private_page/')
+@login_required(session)
+def private_page() -> str:
+    return render_template('personal_pages/personal_page.html')
+
+
 @app.route('/view_post/')
 @login_required(session)
-def view_post():
+def view_post() -> str:
     """Open a page designed for displaying a post."""
-    post = FullyFeaturedPost(int(request.args.to_dict().get('post_id')))
-    return render_template('personal_pages/post_page.html', post=post,
-                           current_user_follows=get_user().SubscriptionManager.get_follows)
+    post_id = int(request.args.to_dict().get('post_id'))
+    post = FullyFeaturedPost(post_id)
+    user = get_user()
+    user.view_post(post_id)
+    subscribed = 1 if post.get_author_id in user.SubscriptionManager.get_follows else 0
+    return render_template('personal_pages/post_page.html', post=post, is_subscribed=subscribed,
+                           liked=1 if user.check_if_liked(post_id)[0] else 0)
+
+
+@app.route('/like_post/')
+@login_required(session)
+def like_post():
+    post_id, new_status = get_request_data({'post_id': None, 'new_status': 1}, request.args.to_dict())
+    get_user().change_like_status(post_id, new_status)
+    return Response('SUCCESSFUL', status=200)
 
 
 @app.route('/comment/', methods=['GET', 'POST'])
@@ -199,11 +223,10 @@ def view_post():
 def add_comment() -> dict:
     """General function for starting the process of
     adding a comment."""
-    #  There is no way to delete comment
-    #   for comment authors but this feature is coming soon.
     data = request.json
-    post_id, comment_text, is_reply = data.get('post_id', None), data.get('comment_text'), \
-        data.get('is_reply', None)
+
+    post_id, comment_text, is_reply = get_request_data({'post_id': None, 'comment_text': None,
+                                                        'is_reply': None}, data)
     write_comment(post_id, comment_text, is_reply)
     return {'author': get_user().get_login, 'text': comment_text,
             'date': datetime.now().strftime("%A, %d. %B %Y %H:%M")}
@@ -211,7 +234,8 @@ def add_comment() -> dict:
 
 @app.route('/ban_comment/', methods=['POST'])
 @author_required
-def ban_comment():
+def ban_comment() -> Response:
+    """Ban a comment under a post. This can function requires for user to be an author."""
     comment_id, reason = request.json.values()
     get_user().author_ban_comment(app, comment_id, reason)
     return Response(status=200)
@@ -219,43 +243,27 @@ def ban_comment():
 
 @app.route('/change_subscriptions/', methods=['GET', 'POST'])
 @login_required(session)
-def change_subscriptions():
+def change_subscriptions() -> Response:
     """Subscribe or unsubscribe from a certain user.
     The action (subscribe/unsubscribe) and the user, to which
     the action is going to be applied, are both passed as a body
     of a post request."""
     author_id, action = map(int, request.json.values())
     manager = get_user().SubscriptionManager
-    protocols = {0: manager.unfollow, 1: manager.follow}
+    protocols = {0: manager.unsubscribe, 1: manager.subscribe}
     protocols.get(action)(author_id)
     return Response(status=200)
 
 
-# WARNING: this will be decorated with @login_required, when most of the
-# features of development_studio are done. It isn't for know to make the
-# testing easier.
 @app.route('/development_studio/')
-def dev_studio():
+@login_required(session)
+def dev_studio() -> str:
     """Load the page of the development studio."""
     return render_template('personal_pages/post_developer_pages/dev_studio.html')
 
 
-@app.route('/upload_file/', methods=['POST'])
-def upload_file():
-    """General function for starting the process
-    of receiving a file from a user and saving it to the disk."""
-    file = request.files['file']
-    response = FileManager(file, get_user().get_user_id).save()
-    if isinstance(response, str):
-        return Response(response, status=406)
-    check_role()
-    return Response('Successfully saved the file. It is '
-                    'going to be able for others to see '
-                    'after it is verified by our experts.', status=200)
-
-
 def check_role() -> None:
-    """This is a part of the process of uploading file.
+    """This is a part of the process of uploading a file.
     Check the user's role, and if it's Viewer (it's user's first posts),
     then change it to Author."""
     user = get_user()
@@ -264,8 +272,25 @@ def check_role() -> None:
         users[user.get_login] = new_user
 
 
+@app.route('/upload_file/', methods=['POST'])
+def upload_file() -> Response:
+    """General function for starting the process
+    of receiving a file from a user and saving it to the disk."""
+    file = request.files['file']
+    tags = request.values.get('tags')
+    if not file or not tags:
+        return Response('NO_DATA', status=400)
+    response = ArticleManager(file, get_user().get_user_id, tags).save()
+    if isinstance(response, str):
+        return Response(response, status=406)
+    check_role()
+    return Response('Successfully saved the file. It is '
+                    'going to be able for others to see '
+                    'after it is verified by our experts.', status=200)
+
+
 @app.route('/restore_password/', methods=['GET', 'POST'])
-def restore_password():
+def restore_password() -> dict:
     """General function for starting the process of restoring
     password. The only thing that should be passed as a body
     of a request is an email, to which a link to restore password
@@ -282,32 +307,61 @@ def restore_password():
     return status
 
 
-@app.route('/search/', methods=['GET', 'POST'])
-def search():
+@app.route('/search/', methods=['POST'])
+def search() -> dict:
     """Search for the posts that are in any way connected to the
     query given. All information that specifies what data is required
     (query itself, result_required and start_with) are passed
     as a body of the request."""
-    query, results_required, start_with = request.json.values()
-    data = search_for(query, results_required, start_with)
+    params = get_request_data({'search_query': None, 'results_required': 5,
+                               'results_received': 0, 'search_strictly': False}, request.json)
+    data = search_for(*params)
     return data
 
 
-@app.route('/search_page/', methods=['GET', 'POST'])
-def search_page():
-    """Just renders page where search results will be displayed.
+@app.route('/search_page/', methods=['GET'])
+def search_page() -> str:
+    """Just renders the page where the search results will be displayed.
     This view does not do any searching. It passes the
     search query as a request argument and also embeds it to
     some values in the page. The search will be done later, when
     the js on the loaded page requests /search/."""
-    query = request.args.to_dict().get('query')
+    query, search_strictly, add_to_search = get_request_data({'query': '', 'search_strictly': '',
+                                                              'add_to_search': ''}, request.args.to_dict())
+    if add_to_search:
+        with open('testing/words.txt', mode='a+') as file:
+            for i in query.split(' '):
+                if i not in file.read().split():
+                    file.write(i + '  ')
     return render_template('personal_pages/search_results_page.html',
-                           search_query=query)
+                           search_query=query, search_strictly=search_strictly)
+
+
+@app.route('/change_interests/', methods=['POST'])
+@login_required(session)
+def change_interests() -> Response:
+    """Function for receiving and updating used interests."""
+    interests = request.json.get('interests')
+    if not interests:
+        return Response('NO_DATA', 406)
+    else:
+        get_user().update_interests(interests)
+        return Response('SUCCESSFUL', 200)
+
+
+@app.route('/change_avatar/', methods=['POST'])
+@login_required(session)
+def change_avatar() -> Response:
+    """Function for changing the user's avatar. Receives the new avatar as a form data
+    in the body of the request."""
+    file = request.files['file']
+    ImageManager(file, get_user().get_user_id).save()
+    return Response('SUCCESSFUL', 200)
 
 
 @app.route('/log_out')
 @login_required(session)
-def log_out():
+def log_out() -> Response:
     """Log user out (he will no longer pass through @login_required),
     clean the session."""
     logout_user()
