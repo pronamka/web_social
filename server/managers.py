@@ -1,10 +1,9 @@
 from datetime import datetime
-from ast import literal_eval
 from abc import ABC
-from typing import Optional, Literal
+from typing import Union
 
 from server.database import DataBase
-from server.posts import Post, UserPostRegistry, FullyFeaturedPost, Comment, CommentsRegistry
+from server.posts import UserPostRegistry, CommentsRegistry
 
 
 class Manager(ABC):
@@ -30,7 +29,7 @@ class PostManager(Manager):
     def create_post(self, user_id: int, post_title: str) -> None:
         query = "INSERT INTO posts (user_id, title, date) VALUES (?, ?, ?);"
         data_package = (user_id, post_title, datetime.now().strftime("%A, %d. %B %Y %I:%M%p"))
-        self.database.insert(query)
+        self.database.insert(query, data_package)
 
     def delete_post(self, post_id: int) -> None:
         self.database.delete(f"""DELETE FROM posts WHERE post_id='{post_id}'""")
@@ -53,39 +52,14 @@ class UserPostManager(UserManager):
         self.post_amount = 0
         self.comments_amount = 0
 
-    """def fetch_posts(self, amount: int) -> int:
-        for post in UserPostRegistry.get_posts(amount, len(self.posts),
-                                               {'of_user': self.user_id}, FullyFeaturedPost):
-            self.post_ids.append(post.get_id)
-            self.posts[self.post_amount] = post
-            self.post_amount += 1
-        return self.post_amount
-
-    def fetch_comments(self, amount):
-        def get_comment_ids(comments_required):
-            ids = tuple(self.post_ids) if len(self.post_ids) != 1 else '('+str(self.post_ids[0])+')'
-            formatted_req = self.comments_request.format(ids, comments_required, self.comments_amount)
-            comments = self.database.get_many_singles(formatted_req, size=comments_required)
-            if len(comments) < comments_required:
-                st_length = self.post_amount
-                self.fetch_posts(2)
-                if self.post_amount - st_length != 0:
-                    comments += get_comment_ids(comments_required - len(comments))
-            return comments
-
-        for i in get_comment_ids(amount):
-            self.comments[self.comments_amount] = Comment(i)
-            self.comments_amount += 1
-        return self.comments_amount"""
-
-    def get_latest_posts(self, amount: int, start_with: int):
+    def get_latest_posts(self, amount: int, start_with: int) -> list:
         res = UserPostRegistry.get_posts(amount, start_with, {'of_user': self.user_id})
         return res
 
-    def get_latest_comments(self, amount: int, start_with: int):
+    def get_latest_comments(self, amount: int, start_with: int) -> list:
         return CommentsRegistry.fetch_comments_on_users_post(amount, start_with, self.user_id)
 
-    def get_post_amount(self):
+    def get_post_amount(self) -> int:
         posts = self.database.get_information(f'SELECT COUNT(DISTINCT post_id) FROM posts '
                                               f'WHERE user_id="{self.user_id}"')
         return posts
@@ -95,10 +69,12 @@ class UserPostManager(UserManager):
                                                  f'WHERE post_id="{post_id}"')
         return comments
 
-    def get_post(self, post_id: int) -> Post:
-        assert self.posts.get(post_id) is not None, \
-            f"No post with given id belongs to user: user id: {self.user_id}, requested post id: {post_id}"
-        return self.posts.get(post_id)
+    def get_post(self, post_id: int) -> Union[bool, tuple]:
+        post = self.database.get_information(f'SELECT title, tags FROM posts '
+                                             f'WHERE post_id={post_id} AND user_id={self.user_id}')
+        if not post:
+            return False
+        return post
 
     @property
     def get_posts(self) -> dict:
@@ -115,52 +91,39 @@ class UserPostManager(UserManager):
             self.count += 1
             return list(self.posts.values())[self.count - 1]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}(user_id={self.user_id})"
 
 
 class UserSubscriptionManager(UserManager):
     """Manager for controlling subscriptions"""
+    subscribers_query = 'SELECT subscriber_id FROM subscriptions WHERE author_id={author_id}'
+    subscribed_to_query = 'SELECT author_id FROM subscriptions WHERE subscriber_id={subscriber_id}'
+    subscribe_request = 'INSERT OR IGNORE INTO subscriptions(subscriber_id, author_id, created_on) ' \
+                        'VALUES (?, ?, ?)'
+    unsubscribe_request = 'DELETE FROM subscriptions WHERE subscriber_id={subscriber_id} ' \
+                          'AND author_id={author_id}'
 
     def __init__(self, user_id: int) -> None:
-        super().__init__(user_id, 3)
-        self.followers, self.follows = list(map(literal_eval, self._get_followers()))
+        super().__init__(user_id, 4)
+        self.followers, self.follows = self._get_followers_and_follows()
 
-    def _get_followers(self):
-        return self.database.get_information(f"SELECT followers, follows FROM users WHERE id='{self.user_id}'")
+    def _get_followers_and_follows(self) -> tuple:
+        """Get the ids of user's subscribers and the ids of users, that current user
+        is subscribed to."""
+        return self.database.get_all_singles(self.subscribers_query.format(author_id=self.user_id)), \
+            self.database.get_all_singles(self.subscribed_to_query.format(subscriber_id=self.user_id))
 
-    def follow(self, user_id: int) -> None:
-        self.check_if_subscribed(user_id)
-        self.follows.append(user_id)
-        UserSubscriptionManager(user_id).add_follower(self.user_id)
-        self.database.update(f"UPDATE users SET follows='{self.follows}' WHERE id='{self.user_id}'")
+    def subscribe(self, user_id: int) -> None:
+        self.database.insert(self.subscribe_request, data=(self.user_id, user_id,
+                                                           datetime.now().strftime('%Y-%m-%d')))
 
-    def add_follower(self, user_id: int) -> None:
-        assert user_id not in self.followers, "Some user tried to follow you twice. " \
-                                              "If you encountered this error, please contact " \
-                                              "us at defender0508@gmeail.com"
-        self.followers.append(user_id)
-        self.database.update(f"UPDATE users SET followers='{self.followers}' WHERE id='{self.user_id}'")
-
-    def unfollow(self, user_id: int) -> None:
-        self.follows.remove(user_id)
-        UserSubscriptionManager(user_id).remove_follower(self.user_id)
-        self.database.update(f"UPDATE users SET follows='{self.follows}' WHERE id='{self.user_id}'")
-
-    def remove_follower(self, user_id: int) -> None:
-        self.followers.remove(user_id)
-        self.database.update(f"UPDATE users SET followers='{self.followers}' WHERE id='{self.user_id}'")
-
-    def find_by_id(self, user_id: int) -> str:
-        return self.database.get_information(f"SELECT login FROM users WHERE id='{user_id}'")[0]
-
-    def check_if_subscribed(self, user_id: int) -> None:
-        assert user_id not in self.follows, "You tried to follow the person you are already following." \
-                                            "If you encountered this error, " \
-                                            "please contact us at defender0508@gmeail.com"
+    def unsubscribe(self, user_id: int) -> None:
+        self.database.delete(self.unsubscribe_request.format(subscriber_id=self.user_id,
+                                                             author_id=user_id))
 
     @property
-    def get_followers(self):
+    def get_followers(self) -> list:
         return self.followers
 
     @property
