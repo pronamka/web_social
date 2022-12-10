@@ -46,7 +46,7 @@
         file.append('file', file_data)
         file.append('filename', file_data[name])
         fetch('/change_avatar/', {method: 'POST', body: file, headers: {'Accept': 'appliction/json'}}).then(resp => {
-            alert(JSON.parse(resp))
+            alert(JSON.parse(resp), window.location.reload())
         })
     }
     function sendRequest(method, url, body) {
@@ -69,7 +69,9 @@
         })
     }
     function sendInterestsChanges(){
-        sendRequest('POST', '/change_interests/', {'interests': user_current_interests})
+        sendRequest('POST', '/change_interests/', {'interests': user_current_interests}).then(resp => {
+            window.location.reload()
+        })
     }
     class Interest{
         constructor(name, interests){
