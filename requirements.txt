@@ -9,7 +9,6 @@ Python packages:
 	PyPDF2				2.11.1
 	docx2pdf			0.1.8
 	pywin32				304
-	txtai				5.1.0
 	pdfkit				1.0.0
 
 Other software:
