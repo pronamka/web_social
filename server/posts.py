@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import Union
 from datetime import datetime
+from ast import literal_eval
 import os
 
 from server.database import DataBase
@@ -136,14 +137,14 @@ class CommentsRegistry:
 
     @classmethod
     def fetch_(cls, object_type: str, object_id: int,
-               amount: int, start_with: int):
+               amount: int, start_with: int) -> list:
         conditions = cls.objects.get(object_type, '').format(object_id)
         request = cls.base_request.format(conditions=conditions, amount=amount,
                                           start_with=start_with)
         return [Comment(i, True) for i in cls.database.get_all_singles(request)]
 
     @classmethod
-    def fetch_comments_on_users_post(cls, amount: int, start_with: int, of_user: int):
+    def fetch_comments_on_users_post(cls, amount: int, start_with: int, of_user: int) -> list:
         formatted_request = cls.comments_request.format(of_user=of_user,
                                                         amount=amount, start_with=start_with)
         res = cls.database.get_all_singles(formatted_request)
@@ -155,12 +156,14 @@ class FullyFeaturedPost(PostForDisplay):
 
     def __init__(self, post_id: int) -> None:
         super().__init__(post_id)
-        self.author_id = self._define_author_id()
+        info = self._get_info()
+        self.author_id: int = info[0]
+        self.tags: dict = literal_eval(info[1]) if info[1] else {}
         self.author_avatar = self._get_author_avatar()
 
-    def _define_author_id(self):
-        return self.database.get_information(f'SELECT id FROM '
-                                             f'users WHERE login="{self.get_author}"')[0]
+    def _get_info(self):
+        return self.database.get_information(f'SELECT user_id, tags FROM '
+                                             f'posts WHERE post_id="{self.post_id}"')
 
     def _get_author_avatar(self):
         if os.path.exists('static/avatar_images/' + str(self.get_author_id) + '.jpeg'):
@@ -168,12 +171,33 @@ class FullyFeaturedPost(PostForDisplay):
         else:
             return 'avatar_images/0.jpeg'
 
+    def _flatten_tags(self, tags: dict = None) -> list:
+        """Flatten post's interest tags. This method can be used to also
+        flatten any dictionary of dictionaries, if all leafs are just empty dictionaries.
+        Otherwise, it will raise AttributeError."""
+        if tags is None:
+            tags = {}
+        tags_plain = []
+        for i in tags.keys():
+            tags_plain.append(i)
+            if (t := tags.get(i, None)) != {}:
+                tags_plain += self._flatten_tags(t)
+        return tags_plain
+
+    def get_tags(self, flattened: bool = False) -> Union[list, dict]:
+        """Get post's interest tags. They can be returned either in their initial form with
+        nesting or as a flat list, if flattened is True."""
+        if flattened:
+            return self._flatten_tags(self.tags)
+        else:
+            return self.tags
+
     @property
-    def get_author_avatar(self):
+    def get_author_avatar(self) -> str:
         return self.author_avatar
 
     @property
-    def get_author_id(self):
+    def get_author_id(self) -> int:
         return self.author_id
 
 
