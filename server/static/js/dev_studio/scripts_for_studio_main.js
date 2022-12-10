@@ -2,7 +2,7 @@ const nav_tabs = document.querySelectorAll('[data-tab-value]');
 const tabs_content = document.querySelectorAll('[data-tab-info]');
 const action_protocols = {'hub': {'call': loadHub, 'called': 1}, 
                         'content': {'call': loadContentPage, 'called': 0}, 
-                        'analitics': {'call': loadContentPage, 'called': 0},
+                        'analitics': {'call': displayCharts, 'called': 0},
                         'commentaries': {'call': loadCommentsPage, 'called': 0}, 
                         'translations': {'/trananslations': 0},
                         };
@@ -426,6 +426,80 @@ function loadAllInterests(){
         html = displayInterests(JSON.parse(resp)['interests'], 'All interests', true, false)
         insertHTML('#all_interests', html)
     })    
+}
+class ChartBuilder{
+    constructor(){
+        this.current_chart = null
+    }
+    post_and_dates(){
+        sendRequest('POST', '/load_info/', {'page': 'analytics', 
+        'chart': 'post_and_dates'}).then(resp=>{
+            resp = JSON.parse(resp)['analytics']
+            console.log(resp)
+            JSC.Chart('Your last 30 posts', {
+                type: 'columns',
+                series: [{name: "dates", points: resp}],
+                legend_template: '%icon,%name',
+                legend_visible: false,
+                defaultSeries_lastPoint_label_text: '<b>%seriesName</b>',
+                xAxis: {crosshair: {enabled: true}},
+            })
+        })
+    }
+    views_likes_comments(){
+        sendRequest('POST', '/load_info/', {'page': 'analytics', 
+        'chart': 'views_likes_comments'}).then(resp=>{
+            resp = JSON.parse(resp)['analytics']
+            var views = resp['views']
+            var likes = resp['likes']
+            var comments = resp['comments']
+            JSC.Chart('views_likes', {
+                title_label_text: 'Views, likes, and comments on posts',
+                series: [
+                    {name: "veiws", points: views}, 
+                    {name: "likes", points: likes},
+                {name: 'comments', points: comments}],
+
+            })
+        })
+        this.current_chart = 'views_likes_comments'
+    }
+    activity(){
+        sendRequest('POST', '/load_info/', {'page': 'analytics', 
+        'chart': 'activity'}).then(resp=>{
+            resp = JSON.parse(resp)['analytics']
+            var views = resp['views']
+            var likes = resp['likes']
+            var comments = resp['comments']
+            JSC.Chart('views_likes', {
+                title_label_text: 'Views, likes, and comments over time',
+                series: [
+                    {name: "veiws", points: views}, 
+                    {name: "likes", points: likes},
+                {name: 'comments', points: comments}],
+
+            })
+        })
+        this.current_chart = 'activity'
+    }
+    changeChart(){
+        if (this.current_chart == 'activity'){
+            this.views_likes_comments()
+        }
+        else {
+            this.activity()
+        }
+    }
+}
+
+const chart_builder = new ChartBuilder()
+
+function changeChart(){
+    chart_builder.changeChart()
+}
+
+function displayCharts(){
+    chart_builder.views_likes_comments()
 }
 
 nav_tabs.forEach(tab => {
