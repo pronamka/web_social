@@ -42,6 +42,7 @@
     function search_new(){
         sendRequest('POST', '/search/', settings).then(resp=>{
             var posts=JSON.parse(resp)
+            settings['results_received'] += posts['search_results'].length
             console.log(posts['searched_for'])
             if ((posts['search_results'].length == 0) && (posts['searched_for'] == settings['search_query'])) {
                 addPost('<h2>No results</h2>')
@@ -52,7 +53,6 @@
                 addPost('<h2>No results</h2>')
                 document.getElementById('more_posts_btn').remove()
             }
-            console.log(settings['results_received'] == 0)
             if ((posts['searched_for'] != settings['search_query']) | 
             (settings['results_received'] == 0) ) {
                 console.log('in')
@@ -61,7 +61,6 @@
                 <a onclick="sendRequest(search_strictly('${settings['search_query']}'))">
                     Search ${settings['search_query']}</a>`
             }
-            settings['results_received'] += posts['search_results'].length
             buildPosts(posts['search_results'])})
         }
         
@@ -90,6 +89,7 @@
     function buildHTML(path, author, title, post_id, creation_date){
         html = `<div class="table_cell" id="`+post_id+`">
                     <iframe width="900" height="1075" src="`+ path+`"></iframe>
+                    <a href="/view_post/?post_id=${post_id}" id="post ${post_id}">`+ title+`</a>
                     <details class="post_data" open>
                         <summary>`+title+`</summary>
                         <ul>
