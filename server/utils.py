@@ -12,8 +12,8 @@ from werkzeug.datastructures import FileStorage
 from PIL import Image
 from pdfkit import from_file, configuration
 
+from PyPDF2 import PdfFileReader, errors, PdfReader
 from server.database import DataBase
-from server.search_engine import check_integrity, get_text
 
 allowed_extensions = ('txt', 'jpg', 'docx', 'jpeg', 'png', 'pdf', 'xlsx', 'jpeg', 'html')
 
@@ -37,7 +37,35 @@ class SymbolsNotAllowed(OSError):
         return self.message
 
 
+def check_integrity(stream) -> bool:
+    """Check if it is possible to read the file.
+    If it is not, PdfReader will raise PdfReadError while initializing.
+    :param stream: an instance of tempfile.SpooledTemporaryFile
+    :returns: True, if the file was read successfully;
+              False, if an error occurred while reading (file is corrupted)"""
+    try:
+        PdfReader(stream)
+        return True
+    except errors.PdfReadError:
+        return False
+
+
+def get_text(name: str) -> str:
+    """Get text from a pdf file saved on disk."""
+    print(name)
+    doc = PdfFileReader(name)
+    text = ''
+    for i in doc.pages:
+        try:
+            text += i.extract_text()
+        except TypeError as e:
+            print(f'An error occurred: {e}; The piece of text will be excluded from search.')
+    return text
+
+
 class FileManager(ABC):
+    """ABC for any class that works with files received from client."""
+
     def __init__(self, file: FileStorage, user_id: int) -> None:
         self.errors = []
         self.file = file  # the file is of type FileStorage, not ImmutableMultiDict
@@ -45,7 +73,7 @@ class FileManager(ABC):
         self.filename = self._security_check()
 
     @abstractmethod
-    def _get_allowed_extensions(self):
+    def _get_allowed_extensions(self) -> tuple:
         """Return a tuple of strings representing extensions allowed for
         the file"""
 
@@ -62,7 +90,7 @@ class FileManager(ABC):
         :returns: str with the file extension (without '.')"""
         return self.filename.rsplit('.', 1)[1]
 
-    def _security_check(self):
+    def _security_check(self) -> Union[str, None]:
         """Check if the file has allowed extension and
         only numbers and english letters in its name.
         :returns: str, if the filename is fine; None, if
@@ -115,7 +143,8 @@ class ArticleManager(FileManager):
         information about new post."""
         DataBase(access_level=2).insert(self.insert_article_request, data=self._build_data_package())
 
-    def _build_data_package(self):
+    def _build_data_package(self) -> tuple:
+        """Prepare data that will be inserted in the database."""
         date = datetime.now()
         data_package = (self.user_id, self._new_filename(False), date.strftime('%Y-%m-%d'),
                         date.strftime("%A, %d. %B %Y %H:%M"), self.tags, get_text(self._new_filename()))
@@ -133,7 +162,7 @@ class ArticleManager(FileManager):
             return 'A post with this name already exists, so your file was not saved.' \
                    'Please give it a different name.'
 
-    def _immediate_save(self) -> str:
+    def _immediate_save(self) -> Union[str, None]:
         """Just save a file (called when the file already has the right extension)."""
         if self._get_extension() == 'pdf' and check_integrity(self.file.stream) is False:
             #  self.file.stream is of type SpooledTemporaryFile
@@ -143,13 +172,13 @@ class ArticleManager(FileManager):
                    'our tech support at defender0508@gmail.com'
         self.file.save(self.full_path)
 
-    def _save_from(self):
+    def _save_from(self) -> None:
         _actions = {'docx': self._convert_from_docx, 'html': self._convert_from_html}
         self.file.save(self.full_path)
         _actions.get(self._get_extension())()
         os.remove(self.full_path)
 
-    def _convert_from_html(self):
+    def _convert_from_html(self) -> None:
         """Convert file from html to pdf and save it on disk."""
         from_file(self.full_path, self._new_filename(),
                   options=self.wkhtmltopdf_options, configuration=self.wkhtmltopdf_config)
@@ -171,30 +200,23 @@ class ArticleManager(FileManager):
 
 
 class ImageManager(FileManager):
+    """Class for converting images to jpeg and
+    saving them with the right name."""
     def __init__(self, file: FileStorage, user_id: int) -> None:
         super(ImageManager, self).__init__(file, user_id)
 
-    def _get_allowed_extensions(self):
+    def _get_allowed_extensions(self) -> tuple:
         return 'jpeg', 'jpg', 'png'
 
     def save(self) -> None:
         """Convert an image from png or jpg to jpeg
         Saves all files in ../static/avatar_images/"""
         if self._get_extension() != 'jpeg':  # check if picture already in jpeg format
-            image = Image.open(BytesIO(self.file.read()))  # create an image object
+            image = Image.open(BytesIO(self.file.read()))  # create an image object;
+            # BytesIO passed to Image.open() allows to open to the image without first
+            # saving it on the disk
             jpeg = image.convert('RGB')  # convert image into RGB representation
             jpeg.save(f'static/avatar_images/{self.user_id}.jpeg')  # save the representation as jpeg
-
-
-def convert_image(name: str) -> None:
-    """Convert an image from png or jpg to jpeg
-    Saves all files in ../static/avatar_images/"""
-    if name.rsplit('.', maxsplit=1)[1] != 'jpeg':  # check if picture already in jpeg format
-        path = f'../static/avatar_images/{name}'  # construct path
-        image = Image.open(path)  # create an image object
-        jpeg = image.convert('RGB')  # convert image into RGB representation
-        os.remove(f'../static/avatar_images/{name}')  # delete the old image
-        jpeg.save(f'../static/avatar_images/{name.split(".")[0]}.jpeg')  # save the representation as jpeg
 
 
 class UsersObserver:
@@ -202,20 +224,23 @@ class UsersObserver:
 
     database = DataBase(access_level=4)
 
-    def check_unconfirmed_users(self):
+    def check_unconfirmed_users(self) -> None:
         """Delete all users, who did not confirm their email addresses in an hour.
-        (So user can create a new account with his email.)"""
+        (So user can create a new account with his email). It will stay active forever
+        once launched."""
         while True:
             self._check_on_loop()
             sleep(3600)
 
-    def _check_on_loop(self):
+    def _check_on_loop(self) -> None:
+        """Check if the user hasn't confirmed his email in an hour, and if so, delete it."""
         current_time = datetime.now()
         for i in self._get_users():
             if datetime.strptime(i[1], '%A, %d. %B %Y %H:%M') < current_time - timedelta(hours=1):
                 self.database.delete(f"DELETE FROM users WHERE id='{i[0]}'")
 
     @classmethod
-    def _get_users(cls):
+    def _get_users(cls) -> list[tuple]:
+        """Get all users that haven't confirmed their emails yet."""
         users = cls.database.get_all("SELECT id, registration_date FROM users WHERE status='0'")
         return users
