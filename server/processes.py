@@ -1,11 +1,12 @@
 from typing import Union, Any, Callable, Optional
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timedelta
 from json import dumps, JSONEncoder
 from abc import ABC, abstractmethod
 from functools import wraps
+from ast import literal_eval
 
-from flask import request, render_template, url_for, session, abort
+from flask import request, render_template, url_for, session, abort, redirect
 from flask_login import login_user
 from flask_mail import Mail, Message
 
@@ -20,7 +21,7 @@ from server.posts import AdminPostRegistry, UserPostRegistry, \
     FullyFeaturedPost, CommentsRegistry
 from server.user import UserFactory, Viewer, Author, Admin, UserRole
 from server.managers import Manager
-from server.search_engine import search_post
+from server.search_engine import Searcher
 
 
 def login_required(current_session):
@@ -42,7 +43,7 @@ def login_required(current_session):
                        "while you were logged in. Please follow this link to go to " \
                        "the log in page: <a href='/log_in_page'>Go to log in page</a></h4>"
             elif not current_session.get('login', None):
-                return app.login_manager.unauthorized()
+                return redirect('/log_in_page')
 
             # flask 1.x compatibility
             # current_app.ensure_sync is only available in Flask >= 2.0
@@ -94,11 +95,13 @@ def get_user() -> Union[Viewer, Author, Admin]:
     return users.get(session.get('login'))
 
 
-def search_for(query: str, required_amount: int = 5, start_with=0):
+def search_for(query: str, required_amount: int = 5, start_with=0, strictly: bool = False):
     """General function to search for posts and get information
     about them."""
-    post_ids = search_post(query, limit=required_amount + start_with)[start_with:]
-    res = UserPostRegistry.get_posts_from_ids(post_ids)
+    post_ids = Searcher.search(query, limit=required_amount, start_with=start_with,
+                               strictly=strictly, interests=get_user().get_interests)
+    res = {'search_results': UserPostRegistry.get_posts_from_ids(post_ids[0]),
+           'searched_for': post_ids[1]}
     return dumps(res, cls=Encoder)
 
 
@@ -148,11 +151,91 @@ class Encoder(JSONEncoder):
         return o.__dict__
 
 
+class PostAnalyticsBuilder:
+    database = DataBase()
+    standard_request = 'WITH list(post_id, title) AS (VALUES {values})\
+                        SELECT post_id, title, IFNULL(COUNT(user_id), 0) AS amount\
+                        FROM list LEFT JOIN {table_name} USING (post_id) GROUP BY post_id;'
+    over_time_request = 'WITH l(user_id, created_on) AS (SELECT user_id, created_on FROM {table_name} ' \
+                        'WHERE post_id IN {post_ids}), list(created_on) AS (VALUES {dates}) ' \
+                        'SELECT created_on, IFNULL(COUNT(user_id), 0) AS amount ' \
+                        'FROM list LEFT JOIN l USING (created_on) GROUP BY list.created_on'
+
+    @classmethod
+    def _get_posts(cls, user_id: int, limit: int = -1, offset: int = 0) -> list:
+        """Get a list of tuples containing ids and titles of posts in range,
+        specified by limit and offset."""
+        posts = cls.database.get_all(f'SELECT post_id, title FROM posts WHERE user_id={user_id} '
+                                     f'ORDER BY post_id DESC LIMIT {limit} OFFSET {offset}')
+        return posts
+
+    @classmethod
+    def _get_any(cls, query: str, properties: list[str]) -> list[tuple]:
+        """Get a list of tuples containing any information specified in properties.
+        Used to apply the same sql query to multiple tables in cases where JOIN is not
+        suitable.
+        :param query: an sql query, that contains the substring: `{}`; it will be formatted
+                      to fetch data from different tables.
+        :param properties: a list of strings that represent table names. The given query
+                           will be executed `range(len(properties))` times, fetching data
+                           from one table at a time. """
+        for i in properties:
+            yield cls.database.get_all(query.format(i))
+
+    @classmethod
+    def views_likes_comments(cls, user_id, limit: int = 30, offset: int = 0) -> dict[str: list]:
+        """Get the amount of views, likes, comments on each of the latest posts in
+        range, specified by limit and offset."""
+        analytics = {'views': [], 'likes': [], 'comments': []}
+        all_info: list = cls._get_posts(user_id, limit, offset)
+        req = cls.standard_request.format(values=str(all_info).removeprefix('[').removesuffix(']'),
+                                          table_name='{}')
+        views, likes, comments = cls._get_any(req, ['post_views', 'post_likes', 'comments'])
+        for view, like, comment in zip(views, likes, comments):
+            analytics.get('views').append({'x': view[1], 'y': view[2]})
+            analytics.get('likes').append({'x': like[1], 'y': like[2]})
+            analytics.get('comments').append({'x': comment[1], 'y': comment[2]})
+        return analytics
+
+    @classmethod
+    def _get_all_post_ids(cls, user_id: int) -> tuple[int]:
+        """Get a tuple with ids of all posts user ever made."""
+        query = f'SELECT post_id FROM posts WHERE user_id={user_id}'
+        return tuple(cls.database.get_all_singles(query))
+
+    @classmethod
+    def _get_each_day(cls, limit: int = 30, offset: int = 0) -> str:
+        """Get dates in range from today - offset to today - offset - limit,
+        in format `('YYYY-MM-DD'), ('YYYY-MM-DD')`.
+        This format is need to present data in the form that sqlite's temporary
+        tables use."""
+        now = (datetime.now() - timedelta(days=offset))
+        delta = timedelta(days=1)
+        all_dates = ''
+        for _ in range(limit):
+            all_dates += "('"+(now := (now-delta)).strftime('%Y-%m-%d')+"'), "
+        return all_dates.removesuffix(', ')
+
+    @classmethod
+    def activity_over_time(cls, user_id, limit: int = 30, offset: int = 0) -> dict[str: list]:
+        """Get the amount of views, likes, comments on all user's posts on each
+        day in range specified by limit and offset."""
+        analytics = {'views': [], 'likes': [], 'comments': []}
+        req = cls.over_time_request.format(post_ids=str(cls._get_all_post_ids(user_id)),
+                                           table_name='{}', dates=cls._get_each_day(limit, offset))
+        views, likes, comments = cls._get_any(req, ['post_views', 'post_likes', 'comments'])
+        for view, like, comment in zip(views, likes, comments):
+            analytics.get('views').append({'x': view[0], 'y': view[1]})
+            analytics.get('likes').append({'x': like[0], 'y': like[1]})
+            analytics.get('comments').append({'x': comment[0], 'y': comment[1]})
+        return analytics
+
+
 class InformationGetter:
     """Class for formalizing and getting information
     for loading content for pages (usually called by js on client)"""
 
-    def __init__(self, properties: dict, **kwargs):
+    def __init__(self, properties: dict, **kwargs) -> None:
         """Initialize InformationGetter.
         :param properties: dictionary with all
             the information about what data is required.
@@ -163,18 +246,23 @@ class InformationGetter:
         self.properties = properties
         self.parameters: dict = kwargs.get('parameters')
         self.user = get_user()
-        self.protocols = {'subscribers': self.get_subscriber_amount,
+        self.protocols = {'subscribers': self.get_subscribers,
                           'commentaries_made': ...,
                           'commentaries_received': self.amount_of_commentaries_received_on_post,
                           'post_amount': self.amount_of_posts,
                           'latest_posts': self.get_latest_posts,
                           'dated_posts': self.get_dated_posts,
                           'latest_comments': self.get_latest_comments_or_replies,
-                          'latest_comments_dev': self.get_latest_comments_on_users_posts}
+                          'latest_comments_dev': self.get_latest_comments_on_users_posts,
+                          'interests': self.get_interests,
+                          'avatar': self.get_avatar,
+                          'analytics': self.get_analytics}
 
     def get_full_data(self) -> dict:
         """Get all the data that was specified
         when initializing the InformationGetter."""
+        if not self.properties:
+            return {}
         data = {}
         for i in self.properties.keys():
             if not isinstance(result := self.get_information(i), int) \
@@ -190,22 +278,37 @@ class InformationGetter:
             is needed (a key to a dictionary with arguments)"""
         return self.protocols.get(method)()
 
-    def get_subscriber_amount(self):
-        return self.user.SubscriptionManager.get_followers
-
     def _get_from_parameters(self, parameter_keys: dict) -> tuple:
         existing_keys = self.parameters.keys()
         res = tuple((parameter_keys[item] if item not in existing_keys else self.parameters.get(item))
                     for position, item in enumerate(parameter_keys))
         return res
 
-    def get_latest_comments_or_replies(self) -> tuple[FullyFeaturedPost]:
+    def get_analytics(self) -> dict[str: list]:
+        analytics_protocols = {'activity': PostAnalyticsBuilder.activity_over_time,
+                               'views_likes_comments': PostAnalyticsBuilder.views_likes_comments}
+        analytics_required = self._get_from_parameters({'chart': 'views_likes_comments',
+                                                        'limit': 30, 'offset': 0})
+        return analytics_protocols.get(analytics_required[0])(self.user.get_user_id, *analytics_required[1:3])
+
+    def get_avatar(self) -> str:
+        return self.user.get_avatar
+
+    def get_interests(self) -> dict[str: dict]:
+        if self._get_from_parameters({'all_interests': False})[0]:
+            return literal_eval(open('server_settings.txt', mode='r').read())['all_interests']
+        return self.user.get_interests
+
+    def get_subscribers(self) -> list:
+        return self.user.SubscriptionManager.get_followers
+
+    def get_latest_comments_or_replies(self) -> list:
         post_id, amount, start_with, content_type = \
             self._get_from_parameters({'object_id': 0, 'comments_required': 1,
                                        'comments_loaded': 0, 'object_type': 'comment'})
         return CommentsRegistry.fetch_(content_type, post_id, amount, start_with)
 
-    def get_latest_comments_on_users_posts(self):
+    def get_latest_comments_on_users_posts(self) -> list:
         amount, start_with = self.parameters.get('comments_required'), \
                              self.parameters.get('comments_loaded')
         return self.user.PostManager.get_latest_comments(amount, start_with)
@@ -221,18 +324,15 @@ class InformationGetter:
         else:
             return UserPostRegistry.get_posts(amount, start_with, {'verified': True})
 
-    def amount_of_commentaries_made(self, *args):
-        ...
-
     @author_required
-    def amount_of_commentaries_received_on_post(self):
+    def amount_of_commentaries_received_on_post(self) -> int:
         return self.user.PostManager.get_comments_amount(self.parameters.get('post_id'))
 
     @author_required
-    def amount_of_posts(self):
+    def amount_of_posts(self) -> int:
         return self.user.PostManager.get_post_amount()
 
-    def get_dated_posts(self):
+    def get_dated_posts(self) -> list:
         amount, start_with = self._get_from_parameters({'posts_required': 1, 'posts_loaded': 0})
         follows = fol if len((fol := self.user.SubscriptionManager.get_follows)) >= 2 else list(fol).append(0)
         posts = UserPostRegistry.get_posts(amount, start_with, {'from_subscriptions': follows, 'verified': True})
@@ -257,7 +357,9 @@ class InformationLoader:
                     'post_amount': 'object',
                     'subscribers': 'amount'},
             'content': {'latest_posts': 'object'},
-            'comment_section': {'latest_comments_dev': 'object'}, }
+            'comment_section': {'latest_comments_dev': 'object'},
+            'personal_data': {'interests': 'object', 'avatar': 'object'},
+            'analytics': {'analytics': 'object'}}
         data = InformationGetter(protocols.get(params.get('page')),
                                  parameters=params).get_full_data()
         return dumps(data, cls=Encoder)
@@ -409,7 +511,6 @@ class RegistrationHandler:
         """Creates the row in database containing user data."""
         user_data = self._build_data_package()
         query = "INSERT INTO users(login, password, email, registration_date) VALUES (?, ?, ?, ?);"
-        # connect('web_social_v4.db').cursor().execute(query, user_data)
         self.database.insert(query, data=user_data)
 
     def _build_data_package(self) -> tuple:
