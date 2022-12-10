@@ -24,10 +24,11 @@
                 <img src="{{ url_for('static', filename= post.get_author_avatar) }}" class="avatar">
                 <h2 id="author_login">{{ post.get_author }}</h2>
                 <button id="subscribe-btn" onclick="change_subscriptions()">Subscribe</button>
+                <button id="like-btn" onclick="like_btn.changeStatus()">Like</button>
             </div>
             <div id="leave_comment">
                 <textarea placeholder="Your comment" id="comment"></textarea>
-                <button id="send_comment_btn" onclick="sendComment('{{post.get_id}}');">
+                <button id="send_comment_btn" onclick="sendComment('{{post.get_id}}');"></button>
                 <p style="font-family: 'Evanston Tavern 1826'; color: red; font-size: large;">{{errors}}</p>
             </div>
             <p>Comments:</p>
@@ -62,6 +63,38 @@
             return response.text()
         })
     }
+    class LikeButton{
+        constructor(button_item){
+            this.button = button_item
+            this.states = {}
+            this.states['1'] = {'action': 0, 'status': '0'}
+            this.states['0'] = {'action': 1, 'status': '1'}
+            this.styles = {}
+            this.styles['0'] = {'b_c': 'red', 't_c': 'white', 't': 'Like'}
+            this.styles['1'] = {'b_c': 'grey', 't_c': 'white', 't': 'Liked'}
+            this.status = this.defineStatus()
+            
+        }
+        defineStatus(){
+            var current_status = "{{ liked }}"
+            console.log(current_status)
+            this.setStyleSheet(current_status)
+            return current_status
+        }
+        changeStatus(){
+            const new_status = this.states[this.status]['status']
+            fetch(`/like_post/?post_id=${post_id}&new_status=${this.states[this.status]['action']}`, {method: 'GET'} ).then(resp => {
+                this.setStyleSheet(new_status)
+                this.status = new_status
+            })
+        }
+        setStyleSheet(style_sheet_name){
+            
+            this.button.style.backgroundColor = this.styles[style_sheet_name]['b_c']
+            this.button.style.color = this.styles[style_sheet_name]['t_c']
+            this.button.firstChild.data =this.styles[style_sheet_name]['t']
+        }
+    }
     class subscribeButton{
         constructor(button_item){
             this.button = button_item
@@ -70,8 +103,9 @@
                       'unsubscribed': {'action': 1, 'status': 'subscribed'}}
         }
         defineStatus(){
-            const protocols = {'True': 'subscribed', 'False': 'unsubscribed'}
-            var current_status = "{{ post.get_author_id in current_user_follows }}"
+            const protocols = {'1': 'subscribed', '0': 'unsubscribed'}
+            var current_status = "{{ is_subscribed }}"
+
             this.setStyleSheet(protocols[current_status])
             return protocols[current_status]
         }
@@ -92,6 +126,7 @@
         }
     }
     const subscribe_btn = new subscribeButton(document.getElementById('subscribe-btn'))
+    const like_btn = new LikeButton(document.getElementById('like-btn'))
     function change_subscriptions(){
         subscribe_btn.changeStatus()
     }
