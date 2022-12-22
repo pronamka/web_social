@@ -15,9 +15,10 @@ app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
 with open('server_settings.txt', mode='r') as settings_file:
     mail_settings: dict = literal_eval(settings_file.read()).get('mail_settings')
-    app.config['MAIL_USERNAME'] = mail_settings.get('MAIL_USERNAME')
-    app.config['MAIL_DEFAULT_SENDER'] = mail_settings.get('MAIL_DEFAULT_SENDER')
-    app.config['MAIL_PASSWORD'] = mail_settings.get('MAIL_PASSWORD')
+    if not mail_settings.get('STATUS', 0):
+        app.config['MAIL_USERNAME'] = mail_settings.get('MAIL_USERNAME')
+        app.config['MAIL_DEFAULT_SENDER'] = mail_settings.get('MAIL_DEFAULT_SENDER')
+        app.config['MAIL_PASSWORD'] = mail_settings.get('MAIL_PASSWORD')
 
 login_manager = LoginManager(app)
 login_manager.session_protection = 'strong'
