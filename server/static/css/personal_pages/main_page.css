@@ -1,0 +1,155 @@
+#post_flow{
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+}
+
+#post_flow iframe{
+    height: 82vh;
+    width: 35vw;
+}
+
+.table_cell{
+    display: block;
+    margin-right: 2%;
+    margin-left: 2%;
+    margin-bottom: 2vh;
+}
+
+.post-name{
+    display: inline-block;
+    font-size: larger;
+    text-indent: 5px;
+    vertical-align: middle;
+    width: 70%;
+}
+
+.post-short-information{
+    max-width: 40vw;
+    height: 12vh;
+}
+
+.author-name{
+    color: grey;
+    word-break: break-all;
+    text-indent: 2em;
+    width: 70%;
+}
+
+.author-avatar{
+    border-radius: 100%;
+    width: 20%;
+    display: inline-block;
+    max-width: 60px;
+    min-width: 40px;
+    vertical-align: middle;
+}
+
+.post-link{
+    max-width: 70%;
+    word-break: break-all;
+}
+
+@media(max-width: 1200px){
+    #post_flow iframe{
+        height: 70vh;
+        width: 40vw;
+    }
+}
+
+@media(max-width: 900px){
+    .post-short-information{
+        display: inline-block;
+        vertical-align: top;
+        width: 25vw;
+        margin-top: 2vh;
+        height: 70vh;
+    }
+    .post-name{
+        max-height: 40vh;
+    }
+    #post_flow iframe{
+        height: 70vh;
+        width: 55vw;
+    }
+    .table_cell{
+        width: 90vw;
+        display: block;
+        margin-left: 10vw;
+    }
+}
+@media(max-width: 650px){
+    .post-short-information{
+        display: block;
+    }
+    #post_flow iframe{
+        width: 85vw;
+    }
+}
+
+@media(max-width: 460px){
+    .table_cell{
+        margin-left: 15vw;
+    }
+    #post_flow iframe{
+        width: 77vw;
+    }
+    .post-short-information{
+        height: fit-content;
+    }
+    .title-and-avatar-wrapper{
+        width: 77vw;
+        max-height: 11vh;
+    }
+    .author-name{
+        width: 77vw;
+    }
+}
+
+/*@media(max-width: 1400px){
+    #post_flow iframe{
+        height: 600px;
+        width: 450px;
+    }
+}
+@media(max-width: 1230px){
+    #post_flow iframe{
+        height: 500px;
+        width: 400px;
+    }
+}
+
+@media(max-width: 1100px){
+    #post_flow iframe{
+        height: 500px;
+        width: 300px;
+    }
+}
+@media(max-width: 800px){
+    #post_flow iframe{
+        height: 700px;
+        width: 100%;
+    }
+    .table_cell{
+        width: 80%;
+    }
+}
+
+@media(max-width: 450px){
+    #post_flow iframe{
+        width: 80%;
+    }
+    .table_cell{
+        width: 100%;
+    }
+}
+
+@media(max-width: 415px){
+    #post_flow iframe{
+        width: 300px;
+        margin-right: auto;
+        margin-left: auto;
+    }
+}**/
