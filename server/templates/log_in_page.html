@@ -7,35 +7,57 @@
     <meta name="viewport" content="width=device-width">
 </head>
 <body>
-    <dialog id="restore_password_dlg">
+    <dialog id="restore_password_dlg" class="password-restoration-dialog">
         <h2>Restore password</h2>
-        <input type="text" id="email" placeholder="email">
-        <p>or</p>
-        <input type="text" id="restore_by_login" placeholder="login">
-        <button onclick="cancel('restore_password_dlg');" class="modal_cancel_button">Cancel</button>
-        <button onclick="restore()">Send email</button>
+        
+        <p style="display: inline-block; font-size: large;">Enter</p>
+        <div id="password-restoration-credentials">
+            <input type="text" id="password-restoration-credentials-input-email" placeholder="email" class="password-restoration-credentials-input">
+            <p id="password-restoration-choice">or</p>
+            <input type="text" id="password-restoration-credentials-input-login" placeholder="login" class="password-restoration-credentials-input">
+        </div>
+        <div id="password-restoration-buttons">
+            <button onclick="cancel('restore_password_dlg');" id="cancel-password-restoration-button">Cancel</button>
+            <button onclick="restore()" id="send-password-restoration-email-btn">Send</button>
+        </div>
         <p id="error"></p>
+        
     </dialog>
 
     <dialog id="change_session_dlg">
         <h2>Warning</h2>
         <p id="warning_message"></p>
-        <button onclick="cancel('change_session_dlg');" class="modal_cancel_button">Cancel</button>
-        <button onclick="changeSession()">Ok</button>
+        <div id="session-dlg-buttons-container">
+            <button onclick="cancel('change_session_dlg');" class="session-dlg-buttons" id="cancel-session-change-button">Cancel</button>
+            <button onclick="changeSession()" class="session-dlg-buttons" id="change-session-button">Ok</button>
+        </div>
     </dialog>
 
-    <div class="container">
-        <h1>PronamkaScience</h1>
-        <h2>Log In</h2>
-        <img src="{{ url_for('static', filename='images/enter.png') }}">
-        <p id="near_image">Log in your account to acces all the functions</p>
+    <div id="container">
+        <div id="container-left-info">
+            <div id="info-left-container-wrapper">
+                <div>
+                    <img src="{{ url_for('static', filename='images/enter.png') }}" id="log_in_img">
+                    <h1 id="company-name">PronamkaScience</h1>
+                </div>
+                <h2>Log In</h2>
+                <h3 id="near_image"><em>Some catchy phrase</em></h3>
+                <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. 
+                    Suscipit in quidem praesentium commodi expedita id inventore 
+                    odit illo perferendis sunt aut, dignissimos ratione ab consequuntur. 
+                    Dolorum repudiandae totam ad et?</p>
+            </div>
+        </div>
 
-        <input placeholder="login" type="text"  class="info" id="login" accesskey="l">
-        <input placeholder="password" type="password" class="info" id="password" accesskey="p">
-        <button id="log_in" onclick="logIn()">Log In</button>
-
-        <a onclick="showRestorePasswordDialog()" href="#">Forgot your password?</a>
-        <p id="validation_errors">{{errors}}</p>
+        <div id="credentials">
+            <img src="{{ url_for('static', filename='images/pronamka_logo.png') }}" id="company-logo">
+            <h2 id="company-name-mobile">PronamkaScience</h2>
+            <input placeholder="login" type="text"  class="info" id="login" accesskey="l">
+            <input placeholder="password" type="password" class="info" id="password" accesskey="p">
+            <button id="log-in-btn" onclick="logIn()">Log In</button>
+            <a onclick="showRestorePasswordDialog()" href="#" id="password-restoration-link">Forgot your password?</a>
+            <p id="validation_errors">{{errors}}</p>
+        </div>
     </div>
     <script src="{{ url_for('static', filename='js/js_for_log_in_page.js') }}"></script>
 </body>
