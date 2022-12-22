@@ -9,14 +9,15 @@ from server.app_core import app, login_manager, users
 from server.processes import RegistrationHandler, LogInHandler, RestorePasswordNotificationSender, \
     get_user, write_comment, admin_required, login_required, author_required
 from server.utils import UsersObserver, ArticleManager, ImageManager
-from server.posts import FullyFeaturedPost
+from server.posts import PostExtended, FullyFeaturedPost
 from server.user import UserFactory, UserRole
-from server.processes import search_for
+from server.processes import search_for, check_password
 
 
 # send a notification when post on a certain topic (tracked by a user) gets verified
 # make session live even when user's browser window is closed
-# finish views, likes and analytics
+# replies should be deleted on cascade when the main comment is deleted or
+# when the posts the comments are made on gets deleted
 
 # add a way for users to delete their own posts and comments
 
@@ -202,7 +203,7 @@ def private_page() -> str:
 def view_post() -> str:
     """Open a page designed for displaying a post."""
     post_id = int(request.args.to_dict().get('post_id'))
-    post = FullyFeaturedPost(post_id)
+    post = PostExtended(post_id, True, True)
     user = get_user()
     user.view_post(post_id)
     subscribed = 1 if post.get_author_id in user.SubscriptionManager.get_follows else 0
@@ -224,12 +225,33 @@ def add_comment() -> dict:
     """General function for starting the process of
     adding a comment."""
     data = request.json
-
     post_id, comment_text, is_reply = get_request_data({'post_id': None, 'comment_text': None,
                                                         'is_reply': None}, data)
+    if not comment_text:
+        return {}
     write_comment(post_id, comment_text, is_reply)
     return {'author': get_user().get_login, 'text': comment_text,
             'date': datetime.now().strftime("%A, %d. %B %Y %H:%M")}
+
+
+@app.route('/delete_comment/')
+@login_required
+def delete_comment():
+    comment_id = int(request.args.to_dict().get('comment_id'))
+    get_user().remove_comment(comment_id)
+    return Response('SUCCESSFUL', status=200)
+
+
+@app.route('/delete_post/', methods=['POST'])
+def delete_post():
+    post_id, password = get_request_data({'post_id': -1, 'password': '0'}, request.json)
+    user = get_user()
+    if not check_password(user.get_user_id, password):
+        return Response('WRONG_CREDENTIALS', status=406)
+    if user.get_role.value != 2:
+        return Response('NO_PERMISSION', status=406)
+    user.remove_post(int(post_id))
+    return Response('SUCCESSFUL', status=200)
 
 
 @app.route('/ban_comment/', methods=['POST'])
@@ -380,4 +402,4 @@ def load_user(user_id: str):
         return None
 
 
-app.run('0.0.0.0', port=4000, debug=True, use_debugger=True, use_reloader=True)
+app.run(port=4000, debug=True, use_debugger=True, use_reloader=True)
