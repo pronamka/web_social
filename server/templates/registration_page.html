@@ -2,38 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PronamkaScience</title>
-    <link rel='stylesheet' type="text/css" href="{{ url_for('static',  filename='css/styles_for_registration_page.css') }}">
+    <link rel='stylesheet' type="text/css" href="{{ url_for('static',  filename='css/n.css') }}">
     <meta name="viewport" content="width=device-width">
 </head>
 <body>
 <div class="wrapper_weblogins">
-    <div id="logo_container">
-        <p>Pronamka's service for joint scintific work</p>
-        <p>Lorem ispum</p>
-        <ol>
-            <li>Post</li>
-            <li>Comment</li>
-            <li>Lorem ispum</li>
-        </ol>
-    </div>
     <div class="container">
-        <div class="in_content">
-            <h2>Create your account</h2>
-            <div id="inputs">
-                <i class="fa-solid fa-user"></i>
-                <input name="login" placeholder="login" type="text" class="info" id="login"><br>
-                <i class="fa-solid fa-lock"></i>
-                <input name="password" placeholder="password" type="password" class="info" id="password"><br>
-                <i class="fa-solid fa-envelope-open"></i>
-                <input name="email" placeholder="email" type="email" class="info" id="email"><br>
-                <button onclick="sendData();" id="create_account_button">Submit</button>
-            </div>
-            <p id="validation_errors">{{errors}}</p>
-
-            <p>Already have an account? <a href="/log_in_page">Log in</a></p>
-            
+        <div id="app_info">
+            <img src="{{ url_for('static',  filename='images/pronamka.ico') }}" id="app_logo">
+            <h3 style="display: inline-block;">PronamkaScience</h3>
         </div>
+        <div id="inputs">
+            <h2>Create an account</h2>
+            <i class="fa-solid fa-user"></i>
+            <input name="login" placeholder="login" type="text" class="info" id="login"><br>
+            <i class="fa-solid fa-lock"></i>
+            <input name="password" placeholder="password" type="password" class="info" id="password"><br>
+            <i class="fa-solid fa-envelope-open"></i>
+            <input name="email" placeholder="email" type="email" class="info" id="email"><br>
+            <button onclick="sendData();" id="create_account_button">Submit</button>
+            <p id="validation_errors">{{errors}}</p>
+            <p>Already have an account? <a href="/log_in_page">Log in</a></p>
+        </div>
+        
     </div>
 </div>
 <script>
@@ -70,5 +63,6 @@
         }
     }
 </script>
+
 </body>
 </html>
