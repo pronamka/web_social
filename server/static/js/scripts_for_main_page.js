@@ -34,7 +34,8 @@ function buildPosts(post_dict){
             author = post_dict[i]['author'];
             post_id = post_dict[i]['post_id'];
             path = '/static/upload_folder/'+title;
-            post = buildHTML(path, author, title, post_id);
+            author_avatar = post_dict[i]['author_avatar']
+            post = buildHTML(path, author, title, post_id, author_avatar);
             addPost(post);
         }
         catch(error){
@@ -42,13 +43,17 @@ function buildPosts(post_dict){
         }
     }
 }
-function buildHTML(path, author, title, post_id){
+function buildHTML(path, author, title, post_id, author_avatar){
     html = `<object class="table_cell">
-            <iframe width="300" height="500" class="preview" src="`+ path+`"></iframe>
-            <div class="for_preview">
-                <p class="post_name">
-                <a href="/view_post/?post_id=${post_id}" id="post ${post_id}">`+ title+`</a>
-                </p><br><p class="person_name">by `+ author+`</p>
+            <iframe class="preview" src=${path} id="post_preview ${post_id}"></iframe>
+            <div class="post-short-information">
+                <div class='title-and-avatar-wrapper'>
+                    <img class="author-avatar" src="static/${author_avatar}">
+                    <p class="post-name">
+                        <a href="/view_post/?post_id=${post_id}" class="post-link" id="post ${post_id}">${title}</a>
+                    </p>
+                </div>
+                <p class="author-name">by `+ author+`</p>
             </div>
             </object>`
             ;
@@ -64,13 +69,3 @@ function addPost(html) {
     return template.content.firstChild;
 }
 
-
-current_position = 380
-window.addEventListener("scroll", function(event) {
-    var top = this.scrollY
-    console.log(top, current_position)
-    if (current_position < top){
-        current_position += 620
-        getPosts();
-    } 
-}, false);
