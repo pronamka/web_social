@@ -24,6 +24,31 @@ from server.managers import Manager
 from server.search_engine import Searcher
 
 
+class RegistrationState(Enum):
+    """Represents possible conditions of registration process."""
+    LoginAlreadyExists = 0
+    FieldsNotFilled = 1
+    CredentialsFine = 2
+    SuccessfullyCreated = 3
+
+
+class LogInState(Enum):
+    """Represents possible conditions of the process of logging in."""
+    WrongCredentials = 1
+    UserAlreadyLoggedIn = 2
+    EmailNotConfirmed = 3
+    CredentialsFine = 4
+    AdminUser = 5
+
+
+class Encoder(JSONEncoder):
+    """Class for encoding objects, that are not
+    serializable by default."""
+
+    def default(self, o: Any) -> Any:
+        return o.__dict__
+
+
 def login_required(current_session):
     """
     If you decorate a view with this, it will ensure that the current user is
@@ -126,29 +151,12 @@ def write_comment(post_id: int, comment_text: str, is_reply: int = None) -> None
                                         f'user_id) VALUES(?, ?, ?, ?, ?);', data=data_package)
 
 
-class RegistrationState(Enum):
-    """Represents possible conditions of registration process."""
-    LoginAlreadyExists = 0
-    FieldsNotFilled = 1
-    CredentialsFine = 2
-    SuccessfullyCreated = 3
-
-
-class LogInState(Enum):
-    """Represents possible conditions of the process of logging in."""
-    WrongCredentials = 1
-    UserAlreadyLoggedIn = 2
-    EmailNotConfirmed = 3
-    CredentialsFine = 4
-    AdminUser = 5
-
-
-class Encoder(JSONEncoder):
-    """Class for encoding objects, that are not
-    serializable by default."""
-
-    def default(self, o: Any) -> Any:
-        return o.__dict__
+def check_password(user_id: int, password: str) -> bool:
+    if not check_password_hash(DataBase(access_level=1).get_information(f'SELECT password FROM users '
+                                                                        f'WHERE id={user_id}', (False,))[0], password):
+        return False
+    else:
+        return True
 
 
 class PostAnalyticsBuilder:
@@ -213,7 +221,7 @@ class PostAnalyticsBuilder:
         delta = timedelta(days=1)
         all_dates = ''
         for _ in range(limit):
-            all_dates += "('"+(now := (now-delta)).strftime('%Y-%m-%d')+"'), "
+            all_dates += "('" + (now := (now - delta)).strftime('%Y-%m-%d') + "'), "
         return all_dates.removesuffix(', ')
 
     @classmethod
@@ -296,7 +304,8 @@ class InformationGetter:
 
     def get_interests(self) -> dict[str: dict]:
         if self._get_from_parameters({'all_interests': False})[0]:
-            return literal_eval(open('server_settings.txt', mode='r').read())['all_interests']
+            return {'interests': (t := literal_eval(open('server_settings.txt', mode='r').read()))
+                    .get('all_interests', ''), 'descriptions': t.get('sciences_descriptions', '')}
         return self.user.get_interests
 
     def get_subscribers(self) -> list:
@@ -333,9 +342,11 @@ class InformationGetter:
         return self.user.PostManager.get_post_amount()
 
     def get_dated_posts(self) -> list:
-        amount, start_with = self._get_from_parameters({'posts_required': 1, 'posts_loaded': 0})
+        amount, start_with, post_type = self._get_from_parameters({'posts_required': 1, 'posts_loaded': 0,
+                                                                   'post_type': 1})
         follows = fol if len((fol := self.user.SubscriptionManager.get_follows)) >= 2 else list(fol).append(0)
-        posts = UserPostRegistry.get_posts(amount, start_with, {'from_subscriptions': follows, 'verified': True})
+        posts = UserPostRegistry.get_posts(amount, start_with, {'from_subscriptions': follows, 'verified': True},
+                                           post_type=post_type)
         return posts
 
 
