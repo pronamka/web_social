@@ -1,0 +1,142 @@
+#post-page{
+    display: flex;
+}
+
+#post-wrapper{
+    margin-left: max(50px, 7vh);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+#post-iframe{
+    width: 60vw;
+    height: 90vh;
+    display: block;
+    margin-top: 2vh;
+}
+
+#page-information-wrapper{
+    display: inline-block;
+    width: 30vw;
+    margin-left: 2vw;
+    margin-top: 3vh;
+}
+
+#author-avatar{
+    width: 20vw;
+    max-width: 100px;
+    border-radius: 100%;
+    display: inline-block;
+    vertical-align: top;
+}
+
+#author-subscribe-wrapper{
+    display: inline-block;
+    margin-left: 2vw;
+}
+
+#author-login{
+    display: inline-block;
+    margin-right: 4vw;
+}
+
+#subscribers-amount{
+    font-size: large;
+    display: inline-block;
+}
+
+#subscribe-btn{
+    display: block;
+    border-radius: 7px;
+    border: none;
+    padding-top: 0.5vh;
+    padding-bottom: 0.5vh;
+    cursor: pointer;
+    font-size: medium;
+    max-width: 110px;
+}
+
+#post-information-wrapper{
+    border-top: 1px solid black;
+    border-bottom: 1px solid black;
+    border-radius: 10px;
+    padding-left: 1vw;
+    padding-right: 1vw;
+    margin-top: 5vh;
+    margin-bottom: 2vh;
+    width: 28vw;
+    box-shadow: 1px 1px 3px grey;
+}
+
+#post-title{
+    width: 15vw;
+    display: inline-block;
+}
+
+#like-btn{
+    width: 10vw;
+    border-radius: 7px;
+    border: none;
+    padding-top: 0.25vh;
+    padding-bottom: 0.25vh;
+    cursor: pointer;
+    font-size: medium;
+    max-width: 110px;
+}
+
+#views-and-likes-info{
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: -1vh;
+    justify-content: space-between;
+}
+
+#views-and-likes-info > p{
+    font-family:'Times New Roman', Times, serif;
+    font-size: large;
+    display: inline-block;
+}
+
+#likes-amount{
+    margin-right: 7.5vw;
+}
+
+#comment{
+    margin-top: 3vh;
+    width: 30vw;
+    border: none;
+    border-bottom: 1px solid grey;
+    margin-bottom: -1px;
+    resize:none;
+    font-size: large;
+}
+
+#comment:focus-visible{
+    border: none;
+    border-bottom: 1px solid grey;
+    outline: none;
+}
+
+#send_comment_btn{
+    margin-top: 1vh;
+    width: 30vw;
+    border: none;
+    background-color: #403232;
+    color: white;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: large;
+}
+
+#send_comment_btn:hover{
+    box-shadow: 2px 3px 3px 0px grey;
+}
+
+#all-comments{
+    margin-top: 3vh;
+}
+
+.replies-wrapper{
+    margin-left: 2vw;
+}
