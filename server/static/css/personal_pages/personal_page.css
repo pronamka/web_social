@@ -1,0 +1,250 @@
+.wrapper{
+    margin-left: max(50px, 5vw)
+}
+
+#interests-section{
+    width: max(95%, 70vw);
+    max-width: 1000px;
+    margin-top: 4vh;
+    display: block;
+    outline: 1px solid grey;
+    border-radius: 20px
+}
+
+#interests-section-inner-wrapper{
+    margin-left: 2vw;
+    padding-bottom: 1vh;
+}
+
+summary[id='Your interests']{
+    font-size: larger;
+}
+
+details[id='details Your interests'] * {
+    font-size: large;
+}
+
+summary{
+    cursor: pointer;
+}
+
+#interests-use-information{
+    padding-top: 1vh;
+}
+
+#manage_interests_btn{
+    width: 20%;
+    border-radius: 7px;
+    border: none;
+    outline: 1px solid grey;
+    background-color: #403232;
+    color: white;
+    font-size: large;
+    margin-top: max(10px, 1vh);
+    margin-left: auto;
+    margin-right: 2vw;
+    display: block;
+}
+
+.selected{
+    color: black;
+    background-color: lightgreen;
+}
+.unselected{
+    color: black;
+    background-color: lightcoral;
+}
+
+
+
+
+#manage_interests_dlg:not([open]){
+    display: none;
+}
+
+#manage_interests_dlg{
+    width: 80vw;
+    max-height: 80vh;
+    border: none;
+    border-radius: 15px;
+    outline: 1px solid grey;
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+    align-content: flex-start;
+    align-items: baseline;
+}
+
+#all_interests{
+    width: 45vw;
+    margin-top: 2vh;
+    border-right: 1px solid grey;
+    display: inline-block;
+}
+
+#all_interests > details > ul{
+    padding-right: 2vw;
+}
+
+#all_interests > details *{
+    margin-top: 1%;
+    margin-bottom: 1%;
+    border-radius: 10px;
+}
+
+#all_interests > details *:hover{
+    box-shadow: 1px 1px 1px grey;
+}
+
+.interest-status-mark{
+    font-size: large;
+    display: inline-block;
+    margin-left: 2%;
+}
+
+#interests-and-descriptions-wrapper{
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    justify-items: flex-start;
+    align-items: center;
+}
+
+#science-description-wrapper{
+    width: 30vw;
+    margin-top: 2vh;
+    margin-left: 2vw;
+}
+
+#manage-interests-dlg-buttons-wrapper{
+    display: block;
+    margin-left: auto;
+    margin-top: 2vh;
+}
+
+#details[id='details All interests']:not([open]) ~ #science-description-wrapper{
+    margin-top: 0px;
+}
+
+summary[id='All interests']:hover{
+    padding-bottom: 1vh;
+    box-shadow: 2px 2px 8px 0px grey;
+}
+
+#manage-interests-dlg-buttons-wrapper button{
+    border-radius: 7px;
+    cursor: pointer;
+    border: none;
+    font-size: large;
+}
+
+#manage-interests-dlg-buttons-wrapper button:hover{
+    box-shadow: 3px 5px 8px 0px grey;
+}
+
+#close-manage-interests-dlg{
+    background-color: rgb(194, 22, 22);
+    color: white;
+}
+
+#send_interests_btn{
+    background-color: rgb(22, 194, 45);
+    color: white;
+}
+
+@media(max-width: 550px){
+    #manage_interests_btn{
+        font-size: medium;
+        width: 40%;
+    }   
+}
+
+
+
+#avatar_settings{
+    width: max(95%, 70vw);
+    max-width: 1000px;
+    outline: 1px solid grey;
+    border-radius: 20px;
+    margin-top: 2vh;
+}
+
+#avatar-settings-outer-wrapper{
+    padding-top: 1vh;
+    padding-left: 2vw;
+    padding-bottom: 1vh;
+    margin-bottom: 1vh;
+}
+
+#avatar-settings-inner-wrapper{
+    display: flex;
+}
+
+#avatar img{
+    width: 30vw;
+    max-width: 300px;
+}
+
+#change-avatar-wrapper{
+    margin-left: 2vw;
+}
+
+#change-avatar-buttons{
+    width: 30vw;
+}
+
+#send_avatar{
+    border: none;
+    border-radius: 7px;
+    background-color: #403232;
+    color: white;
+    font-size: medium;
+    cursor: pointer;
+    display: block;
+    margin-left: auto;
+    width: 20vw;
+    max-width: 100px;
+    margin-right: 2vw;
+    padding: 2px;
+}
+
+input[type='file']{
+    position: relative;
+    left: -9999rem;
+    display: none;
+}
+
+.avatar-file-label{
+    display: inline-block;
+    width: 45vw;
+    max-width: 400px;
+    border: none;
+    outline: 1px solid grey;
+    font-size: medium;
+    border-radius: 7px;
+    background-color: #403232;
+    color: white;
+    cursor: pointer;
+    text-align: center;
+    padding-top: 1px;
+    padding-bottom: 1px;
+}
+
+#new-avatar-filename{
+    margin-left: 2vw;
+    font-size: larger;
+}
+
+@media(max-width: 600px){
+    #avatar_file{
+        width: 45vw;
+    }
+    #send_avatar{
+        margin-top: 1vh;
+        width: 45vw;
+    }
+    .avatar-file-label{
+        display: block;
+    }
+}
