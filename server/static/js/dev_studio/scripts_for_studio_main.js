@@ -236,6 +236,9 @@ class Post{
     get title(){
         return this.post_title
     }
+    get id(){
+        return this.post_id
+    }
 }
 
 function buildPosts(post_dict){
@@ -245,13 +248,13 @@ function buildPosts(post_dict){
         title = current_post.title;
         author = current_post.author_login;
         path = '/static/upload_folder/'+title;
-        post = buildHTML(path, author, title);
+        post = buildHTML(path, author, title, current_post.id);
         addPost(post);
         }
     }
-function buildHTML(path, author, title){
+function buildHTML(path, author, title, post_id){
     html = `<div class="table_cell">
-            <iframe width="400" height="500" src="`+ path+`"></iframe>
+            <iframe width="400" height="500" src="${path}"></iframe>
             <details class="post_data" open>
                 <summary>Post information</summary>
                 <ul>
@@ -259,8 +262,30 @@ function buildHTML(path, author, title){
                 <li>Author: `+author+`</li>
                 </ul>
             </details>
+            <button onclick="deletePostDialog(${post_id})">Delete</button>
         </div>`;
     return html
+}
+
+function deletePostDialog(post_id){
+    var credentials = `<input type="password" id="confirm_deletion_password_inp">
+                    <button id="delete_post_btn" onclick="deletePost(${post_id})">Delete</button>`
+    var delete_post_dlg = document.getElementById('delete_post_dlg')
+    document.getElementById('delete_post_credentials').innerHTML = credentials
+    delete_post_dlg.showModal()
+}
+
+function deletePost(post_id){
+    user_password = document.getElementById('confirm_deletion_password_inp').value
+    sendRequest('POST', '/delete_post/', {'post_id': post_id, 'password': user_password}).then(resp=>{
+        if (resp == 'SUCCESSFUL'){
+            alert('Deleted Successfully')
+            document.getElementById('delete_post_dlg').close()
+        }
+        else{
+            alert('Something went wrong!')
+        }
+    })
 }
 
 function addPost(html) {
