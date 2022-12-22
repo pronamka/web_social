@@ -84,6 +84,14 @@
             </div>
 
             <div class="tabs__tab" id="content" data-tab-info>
+                <dialog id="delete_post_dlg">
+                    <h2>Delete publication</h2>
+                    <p><em>Warning! </em>This action cannot be undone.
+                    You could upload the article again, but all the comments, views,
+                    and likes will not be recovered.</p>
+                    <p>Enter your password to delete the publication.</p>
+                    <div id="delete_post_credentials"></div>
+                </dialog>
                 <h2>Your posts</h2>
                 <button onclick="document.getElementById('upload_article_dlg').showModal(); loadAllInterests();" id="show_upload_dlg">Upload Article</button>
                 <div id="my_posts"></div>
