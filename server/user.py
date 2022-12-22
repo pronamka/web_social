@@ -52,6 +52,10 @@ class User(UserMixin, ABC):
             DataBase(access_level=4).delete(f'DELETE FROM post_likes '
                                             f'WHERE user_id={self.user_id} AND post_id={post_id}')
 
+    def remove_comment(self, comment_id: int) -> None:
+        DataBase.execute_script(f'DELETE FROM comments WHERE comment_id={comment_id} AND user_id={self.user_id};'
+                        f'DELETE FROM comments WHERE is_reply={comment_id}')
+
     @staticmethod
     def _get_time():
         return datetime.datetime.now().strftime('%Y-%m-%d')
@@ -169,6 +173,15 @@ class Author(User):
         """Bun a comment under the user's post."""
         CommentBanMessageSender(current_app, comment_id,
                                 self.get_login, reason).send_ban_notification()
+
+    def remove_post(self, post_id: int) -> None:
+        db = DataBase(access_level=4)
+        post_title = db.get_information(f'SELECT title FROM posts WHERE post_id={post_id}')
+        if not post_title:
+            return
+        db.execute_script(f'DELETE FROM posts WHERE post_id={post_id} AND user_id={self.user_id};'
+                                f'DELETE FROM comments WHERE post_id={post_id}')
+        os.remove(f'static/upload_folder/{post_title[0]}')
 
     @property
     def get_role(self) -> UserRole.Author:
