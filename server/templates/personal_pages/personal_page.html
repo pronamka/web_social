@@ -1,284 +1,68 @@
 {% extends 'personal_pages/base.html' %}
 {% block title %}{{session.get('login')}}'s page{% endblock %}
 {% block content %}
-<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
-<meta name="viewport" content="width=device-width">
-<main role="main">
-    <style>
-        .selected{
-            color: black;
-            background-color: lightgreen;
-        }
-        .unselected{
-            color: black;
-            background-color: lightcoral;
-        }
-    </style>
-    <article>
-        <div class="wrapper">
-            <div class="notes">
-                <dialog id="manage_interests_dlg">
-                    <h2>Choose new interests</h2>
-                    <div id="all_interests"></div>
-                    <button onclick="sendInterestsChanges()" id="send_interests btn"></button>
-                </dialog>
-                <div id="interests_list"></div>
-                <button onclick="chooseInterest()" id="manage_interests btn">Manage</button>
-                <div id="avatar_settings">
-                    <p>Your avatar</p>
-                    <div id="avatar"></div>
-                    <input type="file" placeholder="Choose a picture" id="avatar_file">
-                    <button onclick="sendAvatar()" id="send_avatar">Send</button>
-                    <p><em>pictures can only be in .jpg, .png, .jpeg</em></p>
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/personal_pages/personal_page.css')}}">
+<div class="wrapper">
+    <div class="notes">
+        <dialog id="manage_interests_dlg">
+            <h2>Choose new interests</h2>
+            <p>
+                Click the cross to near the name of the science you want to add to your 
+                interests, or the check mark to remove it from interests.
+                When you add a subsection of a science, all parent sciences are 
+                also added to your interests.
+            </p>
+            <div id="interests-and-descriptions-wrapper">
+                <div id="all_interests"></div>
+                <div id="science-description-wrapper">
+                    <p id="science-description">A short description of a science will appear here when you hover over it.</p>
+                </div>
+            </div>
+            <div id="manage-interests-dlg-buttons-wrapper">
+                <button onclick="document.getElementById('manage_interests_dlg').close()" id="close-manage-interests-dlg">Cancel</button>
+                <button onclick="sendInterestsChanges()" id="send_interests_btn">Update Interests</button>
+            </div>
+        </dialog>
+        <div id="interests-section">
+            <div id="interests-section-inner-wrapper">
+                <div id="interests-use-information">
+                    <h2>Interests</h2>
+                    <p>
+                        <em>
+                            We use interests to recommend you more personalized content.
+                            They affect posts you get on the main page as well as the 
+                            search results.
+                        </em>
+                    </p>
+                </div>
+                <div id="manage-interests-wrapper">
+                    <div id="interests_list"></div>
+                    <button onclick="chooseInterest()" id="manage_interests_btn">Manage</button>
                 </div>
             </div>
         </div>
-    </article>
-</main>
-<script>
-    const url = '/load_info/'
-    var user_current_interests = ''
-    var interests_plain = {}
-    document.addEventListener('DOMContentLoaded', loadPersonalData())
-    function sendAvatar(){
-        const file_data = document.getElementById('avatar_file').files[0]
-        const file = new FormData()
-        file.append('file', file_data)
-        file.append('filename', file_data[name])
-        fetch('/change_avatar/', {method: 'POST', body: file, headers: {'Accept': 'appliction/json'}}).then(resp => {
-            alert(JSON.parse(resp), window.location.reload())
-        })
-    }
-    function sendRequest(method, url, body) {
-        const headers = {'Content-Type': 'application/json'}
-        return fetch(url, {
-            method: method,
-            body: JSON.stringify(body),
-            headers: headers}).then(response => {
-            return response.text()
-        })
-    }
-    function loadPersonalData(){
-        sendRequest('POST', url, {'page': 'personal_data'}).then(resp => {
-            user_current_interests = JSON.parse(resp)['interests']
-            var avatar = document.getElementById('avatar')
-            console.log(resp)
-            avatar.innerHTML = `<img src=${JSON.parse(resp)['avatar']}>`
-            console.log(avatar)
-            insertHTML(displayInterests(user_current_interests))
-        })
-    }
-    function sendInterestsChanges(){
-        sendRequest('POST', '/change_interests/', {'interests': user_current_interests}).then(resp => {
-            window.location.reload()
-        })
-    }
-    class Interest{
-        constructor(name, interests){
-            
-            this.name = name
-            this.status = this.defineStatus()
-            this.children = {}
-            var keys = Object.keys(interests)
-            this.indexInterests(interests)
-        }
-        indexInterests(interests){
-            var keys = Object.keys(interests)
-            for (var i=0, l = keys.length; i<l; i++){
-                this.children[keys[i]] = new Interest(keys[i], interests[keys[i]])
-                this.children[keys[i]] = new Interest(keys[i], interests[keys[i]])
-            }
-        }
-        defineStatus(){
-            if (this.name in interests_plain){
-                return true
-            }
-            else{
-                return false
-            }
-        }
-        changeStatus(interest){
-            var elem = document.getElementById(interest)
-            var mark = document.getElementById(`interests_chosen_mark ${interest}`)
-            if (this.children[interest] == true){
-                elem.setAttribute('class', 'interests unselected')
-                mark.innerText = '&#x2717;'
-            }
-            else{
-                elem.setAttribute('class', 'interests selected')
-                mark.innerText = '&#x2713;'
-            }
-        }
-    }
-    function getParent(key){
-        console.log(key)
-        var elem = document.getElementById(key)
-        var child_of = elem.getAttribute('child_of')
-        return child_of
-    }
-    function getFullInheritanceTree(key){
-        var elem = document.getElementById(key)
-        var child_of = elem.getAttribute('child_of')
-        var tree = {}
-        s = {}
-        s[key] = {}
-        if (child_of=="All interests"){
-            return s
-        }
-        tree[child_of] = s
-        while (true){
-            var parent = getParent(child_of)
-            if (parent == 'All interests'){
-                return tree
-            }
-            var s = tree
-            tree = {}
-            tree[parent] = s
-            child_of = parent
-        }
-    }
-    function searchAndInsert(interest_tree, user_tree){
-        var interest = Object.keys(interest_tree)[0]
-        interests_plain[interest] = {}
-        if (interest in user_tree){
-            user_tree[interest] = searchAndInsert(interest_tree[interest], user_tree[interest])
-            return user_tree
-        }
-        else{
-            var further_interests = interest_tree[interest]
-            if (further_interests == null){
-                further_interests = {}
-            }
-            user_tree[interest] = further_interests
-            return user_tree
-        }
-    }
-    function flatten(interest_tree_dict){
-        debugger
-        var keys = Object.keys(interest_tree_dict)
-        var result = {}
-        for (var i=0, l=keys.length; i<l; i++){
-            result[keys[i]] = {}
-            if (interest_tree_dict[keys[i]].length != 0){
-                result = Object.assign({}, result, flatten(interest_tree_dict[keys[i]]))
-            }
-        }
-        return result
-    }
-    function search(aim, tree){
-        if (aim in tree){
-            return tree[aim]
-        }
-        else{
-            return search(aim, tree)
-        }
-    }
-    function searchAndDelete(interest_tree, user_tree){
-        debugger
-        var interest = Object.keys(interest_tree)[0]
-        if (Object.keys(interest_tree[interest]).length != 0){
-            user_tree[interest] = searchAndDelete(interest_tree[interest], user_tree[interest])
-            return user_tree
-        }
-        else{
-            var s = flatten(user_tree[interest])
-            for (i in s){
-                delete interests_plain[i]
-            }
-            delete user_tree[interest]
-            delete interests_plain[interest]
-            return user_tree
-        }
-    }
-    function changeStatus(key){
-        var details = document.getElementById(`details ${key}`)
-        if (details){
-            if (details.open){
-                details.open = false
-            }
-            else{
-                details.open = true
-            }
-        }
-        elem = document.getElementById(`${key}`)
-        var tree = getFullInheritanceTree(key)
-        var mark = document.getElementById(`interests_chosen_mark ${key}`)
-        if (key in interests_plain) {
-            user_current_interests = searchAndDelete(tree, user_current_interests)
-            elem.setAttribute('class', 'interests unselected')
-            mark.innerHTML = '&#x2717;'
-        }
-        else{
-            user_current_interests = searchAndInsert(tree, user_current_interests)
-            interests_plain = Object.assign({}, interests_plain, flatten(tree))
-            console.log(user_current_interests)
-            interests_plain[key] = {}
-            elem.setAttribute('class', 'interests selected')
-            mark.innerHTML = '&#x2713;'
-        }
-    }
-    function getIndex(interest){
-        var mark = `<p onclick="changeStatus('${interest}')" id="interests_chosen_mark ${interest}" style="display: inline-block; font-size: 16;">`
-        if (interest in interests_plain){
-            var index = 'class="interests selected"'
-            mark += '&#x2713;'
-        }
-        else if(!(interest in interests_plain)){
-            var index = 'class="interests unselected"'
-            mark += '&#x2717;'
-        }
-        mark += '</p>'
-        return [index, mark]
-    }
-
-    function displayInterests(interests, summary_name='Your interests', with_indexing=false, add_to_chosen=true, summary_index=['', ''], child_of=''){
-        html = `<details id="details ${summary_name}"><summary id="${summary_name}" 
-            ${summary_index[0]} child_of="${child_of}">${summary_name}${summary_index[1]}
-            </summary><ul>`
-        for (const key in interests){
-            if (Object.keys(interests[key]).length == 0){
-                var index, mark = ''
-                if (with_indexing){
-                    var i_m = getIndex(key)
-                    index = i_m[0]
-                    mark = i_m[1]
-                }
-                if (add_to_chosen){
-                    interests_plain[key] = {}
-                }
-                html += `<li id="${key}" ${index} child_of="${summary_name}">${key}${mark}</li>`
-            }
-            else if(typeof interests[key] == 'object'){
-                if (with_indexing){
-                    summary_index = getIndex(key)
-                }
-                if (add_to_chosen){
-                    interests_plain[key] = {}
-                }
-                html += displayInterests(interests[key], key, with_indexing, add_to_chosen, summary_index, summary_name)
-            }
-        }
-        html += `</ul></details>`
-        return html
-    }
-    function insertHTML(html, parent_node_id='interests_list'){
-        const tab = document.getElementById(parent_node_id);
-        var template = document.createElement('template');
-        html = html.trim(); // Never return a text node of whitespace as the result
-        template.innerHTML = html;
-        tab.appendChild(template.content);
-        return template.content.firstChild;
-    }
-    function chooseInterest(){
-        loadAllInterests()
-        document.getElementById('manage_interests_dlg').showModal()
-    }
-    function loadAllInterests(){
-        sendRequest('POST', '/load_info/', {'page': 'personal_data', 'all_interests': true}).then(resp => {
-            var all_interests = JSON.parse(resp)['interests']
-            html = displayInterests(all_interests, 'All interests', true, false)
-            insertHTML(html, 'all_interests')
-        })    
-    }
-</script>
+        <div id="avatar_settings">
+            <div id="avatar-settings-outer-wrapper">
+                <h2>Avatar</h2>
+                <div id="avatar-settings-inner-wrapper">
+                    <div id="avatar"></div>
+                    <div id="change-avatar-wrapper">
+                        <label for="avatar_file" class="avatar-file-label">
+                            Choose File
+                        </label>
+                        <p id="new-avatar-filename">No file selected.</p>
+                        <input type="file" placeholder="Choose a picture" 
+                        id="avatar_file" accept="image/jpeg, image/jpg, image/png"
+                        onchange="displayFilename()">
+                        <p style="font-size: large; margin-left: 2vh;">
+                            <em>Warning! Pictures can only be in .jpg, .png, .jpeg</em>
+                        </p>
+                    </div>
+                </div>
+                <button onclick="sendAvatar()" id="send_avatar">Send</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='js/personal_page.js') }}"></script>
 {% endblock %}
