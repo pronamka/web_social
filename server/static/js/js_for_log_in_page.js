@@ -2,8 +2,8 @@ const already_logged_in_dlg = document.getElementById('change_session_dlg')
 
 const restore_password_dlg = document.getElementById('restore_password_dlg')
 const errors_message = document.getElementById('error')
-const email_inp = document.getElementById('email')
-const restore_by_login_inp = document.getElementById('restore_by_login')
+const email_inp = document.getElementById('password-restoration-credentials-input-email')
+const restore_by_login_inp = document.getElementById('password-restoration-credentials-input-login')
 
 const login_inp = document.getElementById('login')
 const password_inp = document.getElementById('password')
