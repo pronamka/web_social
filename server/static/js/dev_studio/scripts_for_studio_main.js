@@ -12,6 +12,9 @@ const btn_upload_files = document.querySelector('btn-upload-files');
 const comments_with_replies = {}
 var article_upload_tags = {}
 var chosen_tags_plain = {}
+const charts_loading_parameters = {'on_posts': 0, 'over_time': 0}
+const charts_info = {'on_posts': {'views': [], 'likes': [], 'comments': []}, 
+                    'over_time': {'views': [], 'likes': [], 'comments': []}}
 
 document.addEventListener('DOMContentLoaded', loadHub());
 
@@ -455,6 +458,8 @@ function loadAllInterests(){
 class ChartBuilder{
     constructor(){
         this.current_chart = null
+        this.loaded = {'on_posts': false, 'over_time': false}
+        this.loaded_all = {'on_posts': false, 'over_time': false}
     }
     post_and_dates(){
         sendRequest('POST', '/load_info/', {'page': 'analytics', 
@@ -471,48 +476,81 @@ class ChartBuilder{
             })
         })
     }
-    views_likes_comments(){
+    loadOnPostActivity(){
+        if (this.loaded_all['on_posts'] == false){
+            document.getElementById('load_more_charts_btn').disabled = false
+        }
         sendRequest('POST', '/load_info/', {'page': 'analytics', 
-        'chart': 'views_likes_comments'}).then(resp=>{
+        'chart': 'views_likes_comments', 'required': 30, 'loaded':  charts_loading_parameters['on_posts']})
+        .then(resp=>{
+            charts_loading_parameters['on_posts'] += 30
             resp = JSON.parse(resp)['analytics']
-            var views = resp['views']
-            var likes = resp['likes']
-            var comments = resp['comments']
-            JSC.Chart('views_likes', {
-                title_label_text: 'Views, likes, and comments on posts',
-                series: [
-                    {name: "veiws", points: views}, 
-                    {name: "likes", points: likes},
-                {name: 'comments', points: comments}],
-
-            })
+            if (resp['views'].length == 0){
+                alert('No more info found')
+                document.getElementById('load_more_charts_btn').disabled = true
+                this.loaded_all['on_posts'] = true
+            }
+            charts_info['on_posts']['views'] = resp['views'].concat(charts_info['on_posts']['views'])
+            charts_info['on_posts']['likes'] = resp['likes'].concat(charts_info['on_posts']['likes'])
+            charts_info['on_posts']['comments'] = resp['comments'].concat(charts_info['on_posts']['comments'])
+            this.displayChart('on_posts')
         })
-        this.current_chart = 'views_likes_comments'
+        this.current_chart = 'on_posts'
+        this.loaded['on_posts'] = true
     }
-    activity(){
+    loadOverTimeActivity(){
+        if (this.loaded_all['over_time'] == false){
+            document.getElementById('load_more_charts_btn').disabled = false
+        }
         sendRequest('POST', '/load_info/', {'page': 'analytics', 
-        'chart': 'activity'}).then(resp=>{
+        'chart': 'activity', 'required': 30, 'loaded': charts_loading_parameters['over_time']})
+        .then(resp=>{
             resp = JSON.parse(resp)['analytics']
-            var views = resp['views']
-            var likes = resp['likes']
-            var comments = resp['comments']
-            JSC.Chart('views_likes', {
-                title_label_text: 'Views, likes, and comments over time',
-                series: [
-                    {name: "veiws", points: views}, 
-                    {name: "likes", points: likes},
-                {name: 'comments', points: comments}],
-
-            })
+            if (resp['views'].length == 0){
+                alert('No more info found')
+                document.getElementById('load_more_charts_btn').disabled = true
+                this.loaded_all['over_time'] = true
+            }
+            charts_loading_parameters['over_time'] += 30
+            charts_info['over_time']['views'] = resp['views'].concat(charts_info['over_time']['views'])
+            charts_info['over_time']['likes'] = resp['likes'].concat(charts_info['over_time']['likes'])
+            charts_info['over_time']['comments'] = resp['comments'].concat(charts_info['over_time']['comments'])
+            this.displayChart('over_time')})
+        this.current_chart = 'over_time'
+        this.loaded['over_time'] = true
+    }
+    displayChart(chart_name){
+        if (this.loaded_all[chart_name] == false){
+            document.getElementById('load_more_charts_btn').disabled = false
+        }
+        else{
+            document.getElementById('load_more_charts_btn').disabled = true
+        }
+        JSC.Chart('views_likes', {
+            title_label_text: 'Views, likes, and comments over time',
+            series: [
+                {name: "veiws", points: charts_info[chart_name]['views']}, 
+                {name: "likes", points: charts_info[chart_name]['likes']},
+            {name: 'comments', points: charts_info[chart_name]['comments']}], 
         })
-        this.current_chart = 'activity'
+        this.current_chart = chart_name
     }
     changeChart(){
-        if (this.current_chart == 'activity'){
-            this.views_likes_comments()
+        if (this.current_chart == 'over_time'){
+            if (!this.loaded['on_posts']){
+                this.loadOnPostActivity()
+            }
+            else{
+                this.displayChart('on_posts')
+            }
         }
         else {
-            this.activity()
+            if (!this.loaded['over_time']){
+                this.loadOverTimeActivity()
+            }
+            else{
+                this.displayChart('over_time')
+            }
         }
     }
 }
@@ -524,7 +562,16 @@ function changeChart(){
 }
 
 function displayCharts(){
-    chart_builder.views_likes_comments()
+    chart_builder.loadOnPostActivity()
+}
+
+function loadMoreChartInfo(){
+    if (chart_builder.current_chart == 'over_time'){
+        chart_builder.loadOverTimeActivity()
+    }
+    else {
+        chart_builder.loadOnPostActivity()
+    }
 }
 
 nav_tabs.forEach(tab => {
