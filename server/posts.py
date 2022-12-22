@@ -123,34 +123,6 @@ class Comment:
         return f'{self.__class__.__name__}({parameters_string})'
 
 
-class CommentsRegistry:
-    database = DataBase()
-    base_request = 'SELECT comment_id FROM comments WHERE status!=3 AND {conditions} ' \
-                   'ORDER BY comment_id DESC LIMIT {amount} OFFSET {start_with}'
-
-    comments_request = "WITH post_ids AS (SELECT post_id FROM posts WHERE verified!=2 AND user_id={of_user} " \
-                       "ORDER BY post_id DESC) SELECT comment_id FROM comments " \
-                       "WHERE post_id IN post_ids AND status!=3 AND is_reply==0 ORDER BY " \
-                       "comment_id DESC LIMIT {amount} OFFSET {start_with}"
-
-    objects = {'comment': 'post_id={} AND is_reply=0', 'reply': 'is_reply={}'}
-
-    @classmethod
-    def fetch_(cls, object_type: str, object_id: int,
-               amount: int, start_with: int) -> list:
-        conditions = cls.objects.get(object_type, '').format(object_id)
-        request = cls.base_request.format(conditions=conditions, amount=amount,
-                                          start_with=start_with)
-        return [Comment(i, True) for i in cls.database.get_all_singles(request)]
-
-    @classmethod
-    def fetch_comments_on_users_post(cls, amount: int, start_with: int, of_user: int) -> list:
-        formatted_request = cls.comments_request.format(of_user=of_user,
-                                                        amount=amount, start_with=start_with)
-        res = cls.database.get_all_singles(formatted_request)
-        return [Comment(i) for i in res]
-
-
 class FullyFeaturedPost(PostForDisplay):
     """PostForDisplay with author id and avatar."""
 
@@ -201,6 +173,88 @@ class FullyFeaturedPost(PostForDisplay):
         return self.author_id
 
 
+class PostExtended(FullyFeaturedPost):
+
+    def __init__(self, post_id: int, with_views_and_likes: bool = False,
+                 with_author_subscribers: bool = False):
+        super().__init__(post_id)
+        self.tags_flattened = self._flatten_tags(self.tags)
+        self.made_ago = self._calculate_time()
+        self.made_ago_str = self._get_str_representation(self.made_ago)
+        if with_views_and_likes:
+            self.views_amount = self._get_views_amount()[0]
+            self.likes_amount = self._get_likes_amount()[0]
+        if with_author_subscribers:
+            self.author_subscribers = self._get_author_subscribers()
+
+    def _get_author_subscribers(self):
+        return self.database.get_all(f'SELECT subscriber_id FROM subscriptions WHERE '
+                                     f'author_id={self.author_id}')
+
+    def _get_views_amount(self):
+        return self.database.get_information(f'SELECT COUNT(user_id) FROM post_views '
+                                             f'WHERE post_id={self.post_id}')
+
+    def _get_likes_amount(self):
+        return self.database.get_information(f'SELECT COUNT(user_id) FROM post_likes '
+                                             f'WHERE post_id={self.post_id}')
+
+    def _calculate_time(self):
+        made_ago = (datetime.now() - datetime.strptime(self.creation_date,
+                                                       '%Y-%m-%d')).total_seconds()
+        return self._get_time_periods(int(made_ago))
+
+    @staticmethod
+    def _get_time_periods(total_seconds: int):
+        periods_in_seconds = [31104000, 2592000, 86400, 3600, 60]
+        time_periods = ['years', 'months', 'days', 'hours', 'minutes']
+        periods_duration = {}
+        for period_name, period_seconds in zip(time_periods, periods_in_seconds):
+            periods_duration[period_name] = total_seconds // period_seconds
+            total_seconds -= periods_duration[period_name]*period_seconds
+        periods_duration['seconds'] = total_seconds
+        return periods_duration
+
+    @staticmethod
+    def _get_str_representation(time_period_durations: dict):
+        str_representation = 'Made '
+        for period, duration in time_period_durations.items():
+            str_representation += str(duration) + ' ' + period + ', ' if duration else ''
+        return str_representation.removesuffix(', ') + ' ago'
+
+    @property
+    def get_subscribers_amount(self):
+        return len(self.author_subscribers)
+
+
+class CommentsRegistry:
+    database = DataBase()
+    base_request = 'SELECT comment_id FROM comments WHERE status!=3 AND {conditions} ' \
+                   'ORDER BY comment_id DESC LIMIT {amount} OFFSET {start_with}'
+
+    comments_request = "WITH post_ids AS (SELECT post_id FROM posts WHERE verified!=2 AND user_id={of_user} " \
+                       "ORDER BY post_id DESC) SELECT comment_id FROM comments " \
+                       "WHERE post_id IN post_ids AND status!=3 AND is_reply==0 ORDER BY " \
+                       "comment_id DESC LIMIT {amount} OFFSET {start_with}"
+
+    objects = {'comment': 'post_id={} AND is_reply=0', 'reply': 'is_reply={}'}
+
+    @classmethod
+    def fetch_(cls, object_type: str, object_id: int,
+               amount: int, start_with: int) -> list:
+        conditions = cls.objects.get(object_type, '').format(object_id)
+        request = cls.base_request.format(conditions=conditions, amount=amount,
+                                          start_with=start_with)
+        return [Comment(i, True) for i in cls.database.get_all_singles(request)]
+
+    @classmethod
+    def fetch_comments_on_users_post(cls, amount: int, start_with: int, of_user: int) -> list:
+        formatted_request = cls.comments_request.format(of_user=of_user,
+                                                        amount=amount, start_with=start_with)
+        res = cls.database.get_all_singles(formatted_request)
+        return [Comment(i) for i in res]
+
+
 class PostRegistry(ABC):
     database = DataBase()
 
@@ -219,17 +273,18 @@ class PostRegistry(ABC):
 class UserPostRegistry(PostRegistry):
     default_request = 'SELECT post_id FROM posts {conditions} ORDER BY post_id ' \
                       'DESC LIMIT {amount} OFFSET {start_with}'
+    post_types = {0: PostForDisplay, 1: FullyFeaturedPost, 2: PostExtended}
 
     @classmethod
     def get_posts(cls, amount: int, start_with: int,
                   parameters: dict = None, retrieve: str = 'post',
-                  post_type: [PostForDisplay, FullyFeaturedPost] = PostForDisplay) -> list:
+                  post_type: int = 1) -> list:
         """This method was described in the parent class."""
         request = cls.default_request.format(conditions=cls.process_conditions(parameters),
                                              amount=amount, start_with=start_with)
         ids = cls.database.get_all_singles(request)
         if retrieve == 'post':
-            return [post_type(post_id) for post_id in ids]
+            return [cls.post_types.get(post_type, PostForDisplay)(post_id) for post_id in ids]
         elif retrieve == 'id':
             return list(ids)
 
