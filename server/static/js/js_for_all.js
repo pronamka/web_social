@@ -45,19 +45,39 @@ function throttle(func, wait, options) {
     };
   
     return throttled;
-  }
-
-document.addEventListener('DOMContentLoaded', loadAvatar())
-function sendRequest(method, url, body) {
-    const headers = {'Content-Type': 'application/json'}
-    console.log(body)
-    return fetch(url, {
-        method: method,
-        body: JSON.stringify(body),
-        headers: headers}).then(response => {
-        return response.text()
-    })
 }
+
+
+
+
+function sendRequest(method, url, body) {
+  //function for sending json via `POST` requests
+  //WARNING: though the request method could be specified,
+  //it will always have `{'Content-Type': 'application/json'}` as
+  //the header (multipart data should not be sent by this function 
+  //and if the request method is `GET`, then the view on the server
+  //side must accept `POST` requests anyways.)
+
+  const headers = {'Content-Type': 'application/json'}
+  return fetch(url, {
+      method: method,
+      body: JSON.stringify(body),
+      headers: headers}).then(response => {
+      return response.text();
+  })
+}
+
+
+function insertHTML(direction, html) {
+  const tab = document.querySelector(direction);
+  var template = document.createElement('template');
+  html = html.trim(); // Never return a text node of whitespace as the result
+  template.innerHTML = html;
+  tab.appendChild(template.content);
+  return template.content.firstChild;
+}
+
+
 function loadAvatar(){
     sendRequest('POST', '/load_info/', {'page': 'personal_data'}).then(resp =>{
     console.log(resp)
@@ -65,6 +85,8 @@ function loadAvatar(){
         document.getElementById('user_avatar_pic_img').innerHTML = `<img src="${JSON.parse(resp)['avatar']}" class="avatar"></img>`
     })
 }
+
+
 function search(){
     var query = document.getElementById('search_query').value
     window.location.replace('/search_page?query='+query)
@@ -80,10 +102,38 @@ function search(){
 }
 
 
+function resizeTextArea(){
+  this.style.height = 0;
+  this.style.height = this.scrollHeight + 'px'
+}
+
+function closeDialog(){
+  this.close()
+}
+
+var load_on_scroll_disabled = false
+
 var load_on_scroll = function(event) {
-    
+    if (load_on_scroll_disabled == true){
+      return 0;
+    }
     if ((window.innerHeight+window.scrollY) >= document.body.offsetHeight-200){
-        console.log('called')
+      try{
         getPosts(2);
+      }
+      catch{
+        local_post_loading_function()
+      }
     } }
+  
 document.addEventListener("scroll", throttle(load_on_scroll, 100));
+
+
+var with_avatar = true
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  if (with_avatar === false){
+    return
+  }
+  loadAvatar()
+})
