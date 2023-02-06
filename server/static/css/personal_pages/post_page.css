@@ -29,6 +29,7 @@
     border-radius: 100%;
     display: inline-block;
     vertical-align: top;
+    aspect-ratio: 1/1;
 }
 
 #author-subscribe-wrapper{
@@ -65,13 +66,18 @@
     padding-right: 1vw;
     margin-top: 5vh;
     margin-bottom: 2vh;
-    width: 28vw;
-    box-shadow: 1px 1px 3px grey;
+    width: 95%;
+    box-shadow: 3px 4px 10px grey;
 }
 
 #post-title{
-    width: 15vw;
+    margin-right: 2vw;
     display: inline-block;
+}
+
+#views-amount{
+    display: inline-block;
+    font-size: large;
 }
 
 #like-btn{
@@ -83,6 +89,7 @@
     cursor: pointer;
     font-size: medium;
     max-width: 110px;
+    display: block;
 }
 
 #views-and-likes-info{
@@ -102,20 +109,25 @@
     margin-right: 7.5vw;
 }
 
-#comment{
-    margin-top: 3vh;
-    width: 30vw;
+body textarea{
     border: none;
     border-bottom: 1px solid grey;
     margin-bottom: -1px;
     resize:none;
     font-size: large;
+    overflow-y: hidden;
+    height: 23px
 }
 
-#comment:focus-visible{
+body textarea:focus-visible{
     border: none;
     border-bottom: 1px solid grey;
     outline: none;
+}
+
+#comment-input{
+    margin-top: 3vh;
+    width: 100%;
 }
 
 #send_comment_btn{
@@ -137,6 +149,197 @@
     margin-top: 3vh;
 }
 
-.replies-wrapper{
+.comment{
+    margin-bottom: 2vh;
+    margin-top: 2vh;
     margin-left: 2vw;
+}
+
+
+#comments_dv .comment{
+    margin-left: 0px;
+}
+
+.comment-main-content{
+    display: grid;
+    width: 100%;
+    grid-template-columns: 15% 80%;
+    grid-auto-rows: minmax(30px, auto);
+}
+
+.comment-author-avatar{
+    width: 30%;
+    border-radius: 100%;
+    aspect-ratio: 1/1;
+    vertical-align: text-top;
+    min-width: 40px;
+    max-width: 80px;
+    grid-row-start: 1;
+    grid-row-end: 3;
+}
+
+.comment-text{
+    margin-top: 0px;
+}
+
+.comment button{
+    background-color: white;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: medium;
+}
+
+.reply-to-comment-button{
+    width: 10vw;
+    outline: 1px solid grey;
+    margin-right: 1vw;
+}
+
+.reply-to-comment-button:hover{
+    background-color: rgb(103 78 78 / 19%);
+}
+
+.load-replies-wrapper{
+    display: inline-block;
+}
+
+.load-replies-button{
+    color: rgb(34, 97, 214);
+    width: 10vw;
+}
+
+.load-replies-button:hover{
+    background-color:rgba(34, 97, 214, 0.272);
+}
+
+.replies-section{
+    margin-left: 2vw;
+}
+
+.load-more-replies-button{
+    color:rgb(34, 97, 214);
+}
+
+.load-more-replies-button:hover{
+    background-color: rgba(34, 97, 214, 0.272);
+}
+
+
+
+.comment-reply-input{
+    margin-left: 3vw;
+    width: 90%;
+    display: block;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.reply-to-comment-wrapper{
+    margin-bottom: 1vh;
+}
+
+.reply-buttons-wrapper{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.reply-buttons-wrapper{
+    margin-left: 1vw;
+    margin-right: 1vw;
+    margin-top: 2vh;
+}
+
+.reply-buttons-wrapper button{
+    width: 30%;
+}
+
+.cancel-sending-reply-button:hover{
+    background-color:rgb(103 78 78 / 19%);
+}
+
+.send-reply-button{
+    background-color: #3e67ff !important;
+    color: white;
+    margin-left: 1vw;
+}
+
+.send-reply-button:hover{
+    background-color: #2a2aef !important;
+}
+
+#load-comments-button{
+    background-color: white;
+    color:rgb(34, 97, 214);
+    border: none;
+    border-radius: 7px;
+    padding: 1vh;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 3vh;
+}
+
+#load-comments-button:hover{
+    background-color:rgba(34, 97, 214, 0.272);
+}
+
+
+
+@media(max-width: 1300px){
+    #post-page{
+        flex-direction: column;
+        flex-wrap: wrap;
+        align-content: center;
+    }
+    #post-wrapper{
+        margin-left: 0px;
+    }
+    #post-iframe{
+        width: 70vw;
+        height: 90vh;
+        display: block;
+        margin-top: 2vh;
+    }
+    #page-information-wrapper{
+        width: 70vw;
+    }
+    #send_comment_btn{
+        display: block;
+        margin-left: auto;
+        margin-right: 2vw;
+    }
+    .comment-main-content{
+        grid-template-columns: 10% 85%;
+    }
+    #like-btn{
+        width: 20vw;
+        max-width: 1000000px;
+    }
+}
+
+@media(max-width: 700px){
+    .comment-main-content{
+        grid-template-columns: 15% 80%;
+    }
+    .reply-to-comment-button{
+        width: 40%;
+    }
+    .load-replies-button{
+        width: 150%;
+    }
+    #send_comment_btn{
+        width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
+
+@media(max-width: 450px){
+    .comment-main-content{
+        grid-template-columns: 20% 75%;
+    }
+    #post-page{
+        margin-left: 10vw;
+    }
 }
