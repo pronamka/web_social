@@ -52,9 +52,21 @@ class User(UserMixin, ABC):
             DataBase(access_level=4).delete(f'DELETE FROM post_likes '
                                             f'WHERE user_id={self.user_id} AND post_id={post_id}')
 
+    def add_comment(self, post_id: int, comment_text: str, is_reply: int):
+        """Add a comment to a certain post.
+            :param post_id: the id of the post under which a comment was left.
+            :param comment_text: the text of the comment.
+            :param is_reply: defines if the comment is a reply to another comment (it
+            equals to 0 if it is not or to an id of another comment, if it is)."""
+        now = datetime.datetime.now()
+        data_package = [post_id, comment_text, now.strftime('%Y-%m-%d'), now.strftime('%A, %d. %B %Y %H:%M'),
+                        is_reply, self.user_id]
+        DataBase(access_level=2).insert(f'INSERT INTO comments(post_id, comment, created_on, date, is_reply, '
+                                        f'user_id) VALUES(?, ?, ?, ?, ?, ?);', data=data_package)
+
     def remove_comment(self, comment_id: int) -> None:
-        DataBase.execute_script(f'DELETE FROM comments WHERE comment_id={comment_id} AND user_id={self.user_id};'
-                        f'DELETE FROM comments WHERE is_reply={comment_id}')
+        DataBase().execute_script(f'DELETE FROM comments WHERE comment_id={comment_id} AND user_id={self.user_id};'
+                                f'DELETE FROM comments WHERE is_reply={comment_id}')
 
     @staticmethod
     def _get_time():
@@ -131,8 +143,8 @@ class Author(User):
     """User that uploaded at least once, and
     his article was verified by admins."""
 
-    reply_sql = f'INSERT INTO comments(post_id, user_id, comment, date, is_reply, status) ' \
-                f'VALUES(?, ?, ?, ?, ?, ?);'
+    reply_sql = f'INSERT INTO comments(post_id, user_id, comment, created_on, date, is_reply, status) ' \
+                f'VALUES(?, ?, ?, ?, ?, ?, ?);'
 
     def __init__(self, data: tuple) -> None:
         super().__init__(data)
@@ -152,27 +164,35 @@ class Author(User):
     def _get_followers_emails(self) -> list:
         """Get email of all user's subscribers."""
         followers_ids = tuple(fol) if len(fol := self.SubscriptionManager.get_followers) \
-            != 1 else f'({fol[0]})'  # sqlite break if the expression `SELECT ... IN `
+            != 1 else f'({fol[0]})'  # sqlite breaks if the expression `SELECT ... IN `
         # used with the tuple with a single element inside it (e.g. with the
-        # tuple that looks something like this: `(1,)`), so it needs to be converted to a string
+        # tuple that looks like this: `(1,)`), so it needs to be converted to a string
         # like `(1)`.
         emails = DataBase().get_all_singles(f'SELECT email FROM users WHERE id IN {followers_ids}')
         return emails
 
-    def author_reply(self, post_id: int, reply_text: str,
-                     accurate_time: str, comment_id: int) -> None:
+    def author_reply(self, post_id: int, reply_text: str, comment_id: int) -> None:
         """Reply to a comment. This method should be specifically used when the
         author replies to a comment under his posts, because it gives the comment a
         status that indicates that the comment is helpful/interesting."""
         database = DataBase(access_level=3)
-        data_package = (post_id, self.user_id, reply_text, accurate_time, comment_id, 1)
+        now = datetime.datetime.now()
+        data_package = [post_id, self.user_id, reply_text, now.strftime('%Y-%m-%d'), now.strftime('%A, %d. %B %Y %H:%M'),
+                        comment_id, 1]
         database.insert(self.reply_sql, data=data_package)
         database.update(f'UPDATE comments SET status=2 WHERE comment_id="{comment_id}"')
 
-    def author_ban_comment(self, current_app, comment_id: int, reason: Optional[str] = None) -> None:
+    def author_ban_comment(self, current_app, comment_id: int, reason: Optional[str] = None) -> Union[bool, None]:
         """Bun a comment under the user's post."""
+        if not self.PostManager.check_comment_belonging(comment_id):
+            return True
         CommentBanMessageSender(current_app, comment_id,
                                 self.get_login, reason).send_ban_notification()
+
+    def mark_comment_as_seen(self, comment_id) -> Union[bool, None]:
+        if not self.PostManager.check_comment_belonging(comment_id):
+            return True
+        DataBase(access_level=3).update(f'UPDATE comments SET status=1 WHERE comment_id={comment_id}')
 
     def remove_post(self, post_id: int) -> None:
         db = DataBase(access_level=4)
@@ -180,7 +200,7 @@ class Author(User):
         if not post_title:
             return
         db.execute_script(f'DELETE FROM posts WHERE post_id={post_id} AND user_id={self.user_id};'
-                                f'DELETE FROM comments WHERE post_id={post_id}')
+                          f'DELETE FROM comments WHERE post_id={post_id}')
         os.remove(f'static/upload_folder/{post_title[0]}')
 
     @property
