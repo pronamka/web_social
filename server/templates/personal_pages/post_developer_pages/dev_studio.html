@@ -4,39 +4,25 @@
     <meta charset="utf-8">
     <title>{% block title %}{% endblock %}</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
-    filename= 'css/personal_pages/stylesForPrivatePage.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
-    filename= 'css/personal_pages/styles_for_Prototype.css') }}">
+    filename= 'css/personal_pages/navigation_bar.css') }}">
+    <link rel="stylesheet" type="text/css" href="/static/css/fontawesome-free-6.2.0-web/css/all.min.css">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
     filename= 'css/personal_pages/dev_studio/styles_for_studio_main.css') }}">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', 
-    filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
-    <meta name="viewport" content="width=device-width">
-    <style>
-        #upload_article{
-            display: inline-block;
-            vertical-align: top;
-        }
-        #latest_comments_table{
-            -webkit-border-horizontal-spacing: 30px;
-        }
-        .comments_table_row:hover{
-            background-color: blanchedalmond;
-            cursor: pointer;
-        }
-    </style>
 </head>
 <body>
     <input type="checkbox" id="nav-toggle">
     <nav class="nav">
         <label for="nav-toggle" class="nav-toggle" onclick id="open_tab_lb"></label>
-        <h2 class="logo">{{session.get('login')}}</h2>
-        <img src="{{ url_for('static', filename= 'avatar_images/' + session.get('id') + '.jpeg') }}" class="avatar">
-        <p id="status">Status: online</p>
+
+        <div id="login-and-avatar-container">
+            <h2 class="logo">{{session.get('login')}}</h2>
+
+            <div id="user_avatar_pic_img"></div>
+        </div>
         <form action="/log_out" method="get" id="log_out_block">
-            <button type="submit" name="log_out" width="100px">Log out</button>
+            <button type="submit" name="log_out" id="log-out-btn">Log out</button>
         </form>
-        <!---<i class="fa-solid fa-arrow-right-from-bracket"></i>--->
+
         <ul class="tabs">
             <li>
                 <button data-tab-value="#hub">Hub</button>
@@ -45,7 +31,7 @@
                 <button data-tab-value="#content" id="dev go_to content">Content</button>
             </li>
             <li>
-                <button data-tab-value="#analitics" id="dev go_to analytics">Analitics</button>
+                <button data-tab-value="#analytics" id="dev go_to analytics">Analytics</button>
             </li>
             <li>
                 <button data-tab-value="#commentaries" id="dev go_to comments">Commentaries</button>
@@ -64,74 +50,177 @@
 <main role="main">
     <article>
         <div class="tab-content">
+
             <dialog id="upload_article_dlg">
-                <h2>Upload an article</h2>
+                <h2>Upload Article</h2>
                 <div id="upload_article">
+                    <label for="inp-file-content" class="article-file-label">
+                        Choose File
+                    </label>
+                    <p id="article-filename">No file selected.</p>
                     <input type="file" name="file" placeholder="Select a file" id="inp-file-content">
-                    <button name="send_file" onclick="uploadArticle()" id="send_article_btn">Post</button>
                 </div>
-                <div id="all_interests"></div>
+                <p>
+                    Click the cross near the name of the science you want to add to post 
+                    tags, or the checkmark to remove it from tags.
+                    When you add a subsection of a science, all parent sciences are 
+                    also added to your interests.
+                    You must choose at least on science to upload an article.
+                </p>
+                <div id="interests-and-descriptions-wrapper">
+                    <div id="all_interests"></div>
+                    <div id="science-description-wrapper">
+                        <p id="science-description">A short description of a science will appear here when you hover over it.</p>
+                    </div>
+                </div>
+                <div id="manage-interests-dlg-buttons-wrapper">
+                    <button onclick="document.getElementById('manage_interests_dlg').close()" id="close-manage-interests-dlg">Cancel</button>
+                    <button onclick="uploadArticle()" id="send_interests_btn">Upload Article</button>
+                </div>
             </dialog>
-            <div class="tabs__tab  active" id="hub" data-tab-info>
-                <h2>Content-creatror account managment pannel.</h2>
-                <div id="last_post">
-                </div>
-                <div id="short_analitics"></div>
-                <dialog id="dialog-upload-file">
-                    <input type="file" name="file" placeholder="Select a file" id="inp-file">
-                    <button name="send_file" placeholder="Post!" onclick="uploadArticle()"></button>
-                </dialog>
+
+            <div class="tabs__tab" id="hub" data-tab-info>
+                <h2 class="tab-header">Content-creator account management panel.</h2>
+                <div id="last_post"></div>
+                <div id="short_analytics"></div>
             </div>
 
-            <div class="tabs__tab" id="content" data-tab-info>
-                <dialog id="delete_post_dlg">
-                    <h2>Delete publication</h2>
-                    <p><em>Warning! </em>This action cannot be undone.
-                    You could upload the article again, but all the comments, views,
-                    and likes will not be recovered.</p>
-                    <p>Enter your password to delete the publication.</p>
-                    <div id="delete_post_credentials"></div>
+            <div class="tabs__tab active" id="content" data-tab-info> 
+                
+
+                <dialog id="delete-post-dialog">
+                    <div id="delete-post-dialog-inner-wrapper">
+                        <h2>Delete publication</h2>
+                        <p id="delete-post-info">
+                            <em id="warning-label">Warning! </em>
+                            This action cannot be undone.<br>
+                            You could upload the article again, but all the comments, views,
+                            and likes will not be recovered.
+                        </p>
+                        <p id="enter-password-label">Enter your password to delete the publication.</p>
+                        <div id="delete-post-dialog-password-input-wrapper">
+                            <input type="password" id="delete-article-user-password-input">
+                            <button id="delete-post-dialog-delete-post-button">Delete</button>
+                        </div>
+                    </div>
                 </dialog>
-                <h2>Your posts</h2>
-                <button onclick="document.getElementById('upload_article_dlg').showModal(); loadAllInterests();" id="show_upload_dlg">Upload Article</button>
+
+
+                <h2 class="tab-header">Your posts</h2>
+                <button onclick="showUploadDialog()" id="show-upload-dialog-button">Upload Article</button>
                 <div id="my_posts"></div>
             </div>
 
-            <div class="tabs__tab" id="analitics" data-tab-info>
-                <h2>Publication analitics</h2>
-                <div id="views_likes" style="width: 1000px; height: 500px;" ></div>
-                <button id="load_more_charts_btn" onclick="loadMoreChartInfo()">Load More</button>
-                <button id="change_chart_btn" onclick="changeChart()">Change chart</button>
+            <div class="tabs__tab" id="analytics" data-tab-info>
+                <h2 class="tab-header">Publication analytics</h2>
+                <div id="analytics-chart"></div>
+                <button id="load-more-charts-button">Load More</button>
+                <button id="change-chart-button">Change chart</button>
                 <div id="subscribers_graph"></div>
                 <div id="comments_info"></div>
             </div>
 
             <div class="tabs__tab" id="commentaries" data-tab-info>
-                <h2>Comments on your publications</h2>
-                <dialog id="reply_dialog"></dialog>
-                <div id="comments_table_dv">
-                    <table id="latest_comments_table">
-                        <tr>
-                            <th>Author</th>
-                            <th>Created on</th>
-                            <th>Content</th>
-                            <th>On posts</th>
-                        </tr>
-                    </table>
+                <h2 class="tab-header">Comments on your publications</h2>
+
+                <dialog id="reply-dialog" class="comment-action-dialog">
+                    <div id="reply-dialog-top-bar">
+                        <h2 class="action-dialog-action-title">Reply</h2>
+                        <button id="reply-dialog-close-reply-dialog-button" class="comment-action-dialog-close-dialog-button">X</button>
+                    </div>
+
+                    <div class="action-dialog-comment-information-wrapper">
+                        <p id="reply-dialog-comment-author-name" class="action-dialog-comment-info">Author: </p>
+                        <p id="reply-dialog-comment-text" class="action-dialog-comment-info">Text: </p>
+                        <p id="reply-dialog-comment-creation-date" class="action-dialog-comment-info">Creation Date: </p>
+                    </div>
+
+                    <textarea placeholder="Your reply" id="reply-dialog-textarea" class="action-dialog-textarea"></textarea>
+                    <button id="reply-dialog-send-reply-button" class="action-dialog-perform-action-button">Send reply</button>
+                </dialog>
+
+                <dialog id="ban-comment-dialog"  class="comment-action-dialog">
+                    <div id="ban-comment-dialog-top-bar">
+                        <h2 class="action-dialog-action-title">Ban</h2>
+                        <button id="ban-comment-dialog-close-ban-comment-dialog-button" class="comment-action-dialog-close-dialog-button">X</button>
+                    </div>
+
+                    <p id="ban-comment-dialog-warning">Warning! This action cannot be undone.</p>
+
+                    <div class="action-dialog-comment-information-wrapper">
+                        <p id="ban-comment-comment-author-name" class="action-dialog-comment-info">Author: </p>
+                        <p id="ban-comment-dialog-comment-text" class="action-dialog-comment-info">Text: </p>
+                        <p id="ban-comment-dialog-comment-creation-date" class="action-dialog-comment-info">Creation Date: </p>
+                    </div>
+                    
+                    <textarea placeholder="Reason (Optional)" id="ban-comment-dialog-textarea" class="action-dialog-textarea"></textarea>
+                    <button id="ban-comment-dialog-ban-button" class="action-dialog-perform-action-button">Ban</button>
+                </dialog>
+
+                <ul id="comments-tables-navigation-tabs">
+                    <li class="comments-tables-navigation-tab-wrapper"><a href="#unseen-comments-tables-div" class="comments-table-direction table-nav-tab-active">Unseen</a></li>
+                    <li class="comments-tables-navigation-tab-wrapper"><a href="#seen-comments-tables-div" class="comments-table-direction">Seen</a></li>
+                    <li class="comments-tables-navigation-tab-wrapper"><a href="#received-author-reply-comments-tables-div" class="comments-table-direction">Received your reply</a></li>
+                    <li class="comments-tables-navigation-tab-wrapper"><a href="#banned-comments-tables-div" class="comments-table-direction">Banned</a></li>
+                </ul>
+
+                <div class="horizontal-line-separator"></div>
+
+                <div id="unseen-comments-tables-div" class="comments-table-tab comments-table-active">
+                    <div id="unseen-comments-table"></div>
+                    <div class="horizontal-line-separator"></div>
+                    <button id="load-more-unseen-comments-button" class="load-more-comments-main-button load-button">Load More</button>
+                </div>
+
+                <div id="seen-comments-tables-div" class="comments-table-tab">
+                    <div id="seen-comments-table"></div>
+                    <div class="horizontal-line-separator"></div>
+                    <button id="load-more-seen-comments-button" class="load-more-comments-main-button load-button">Load More</button>
+                </div>
+
+                <div id="received-author-reply-comments-tables-div" class="comments-table-tab">
+                    <div id="received-author-reply-comments-table"></div>
+                    <div class="horizontal-line-separator"></div>
+                    <button id="load-more-received-author-reply-comments-button" class="load-more-comments-main-button load-button">Load More</button>
+                </div>
+
+                <div id="banned-comments-tables-div" class="comments-table-tab">
+                    <div id="banned-comments-table"></div>
+                    <div class="horizontal-line-separator"></div>
+                    <button id="load-more-banned-comments-button" class="load-more-comments-main-button load-button">Load More</button>
                 </div>
             </div>
 
             <div class="tabs__tab" id="translations" data-tab-info>
-                <h2>Translations managment pannel</h2>
+                <h2 class="tab-header">Translations management panel</h2>
                 <div id="translations_dv">In development...</div>
             </div>
 
-            <div class="tabs__tab" id="copyright" data-tab-info></div>
-            <div class="tabs__tab" id="monetization" data-tab-info></div>
+            <div class="tabs__tab" id="copyright" data-tab-info>
+                <h2 class="tab-header">Channel Copyright Policy</h2>
+                <div>In development...</div>
+            </div>
+            <div class="tabs__tab" id="monetization" data-tab-info>
+                <h2 class="tab-header">Channel Monetization Policy</h2>
+                <div>In development...</div>
+            </div>
         </div>
     </article>
 </main>
+
+<div id="empty-template"></div>
+
+<script src="https://code.jquery.com/jquery-3.6.3.js"></script>
+
 <script src="https://code.jscharting.com/2.9.0/jscharting.js"></script>
-<script src="{{ url_for('static', filename='js/dev_studio/scripts_for_studio_main.js')}}"></script>
+
+<script src="{{ url_for('static', filename='js/js_for_all.js')}}"></script>
+
+
+<script src="{{ url_for('static', filename='js/dev_studio/analytics.js')}}"></script>
+<script src="{{ url_for('static', filename='js/dev_studio/content_page.js')}}"></script>
+<script src="{{ url_for('static', filename='js/dev_studio/commentaries_page.js')}}"></script>
+<script src="{{ url_for('static', filename='js/dev_studio/studio_main.js')}}"></script>
+
 </body>
 </html>
