@@ -42,6 +42,9 @@ class UserPostManager(UserManager):
     # An effective way of separating them without
     # violating DRY should be found
 
+    comment_belonging_request = "WITH p_id AS (SELECT post_id FROM comments WHERE comment_id == " \
+                                "{comment_id}) SELECT user_id FROM posts WHERE post_id IN p_id"
+
     def __init__(self, user_id: int, *args) -> None:
         super(UserPostManager, self).__init__(user_id, 4)
         self.posts = {}
@@ -52,12 +55,22 @@ class UserPostManager(UserManager):
         self.post_amount = 0
         self.comments_amount = 0
 
-    def get_latest_posts(self, amount: int, start_with: int) -> list:
-        res = UserPostRegistry.get_posts(amount, start_with, {'of_user': self.user_id})
+    def get_latest_posts(self, amount: int, start_with: int, post_type: int = 1) -> list:
+        res = UserPostRegistry.get_posts(amount, start_with, {'of_user': self.user_id}, post_type=post_type)
         return res
 
-    def get_latest_comments(self, amount: int, start_with: int) -> list:
-        return CommentsRegistry.fetch_comments_on_users_post(amount, start_with, self.user_id)
+    def get_latest_comments(self, amount: int, start_with: int, status) -> list:
+        return CommentsRegistry.fetch_comments_on_users_post(amount, start_with, self.user_id, status)
+
+    def get_overall_amounts(self, objects):
+        r = {'comments': 'comments', 'views': 'post_views', 'likes': 'post_likes'}
+        post_ids = self.database.get_all_singles(f'SELECT post_id FROM posts WHERE user_id={self.user_id}')
+        post_ids = tuple(post_ids) if len(post_ids) != 1 else f'({post_ids[0]})'
+        info = {}
+        for i in objects:
+            info[i] = self.database.get_all_singles(f'SELECT COUNT(user_id) FROM {r.get(i, "views")} '
+                                                    f'WHERE post_id IN {post_ids}')
+        return info
 
     def get_post_amount(self) -> int:
         posts = self.database.get_information(f'SELECT COUNT(DISTINCT post_id) FROM posts '
@@ -75,6 +88,11 @@ class UserPostManager(UserManager):
         if not post:
             return False
         return post
+
+    def check_comment_belonging(self, comment_id: int) -> bool:
+        post_author_id = self.database.get_information(
+            self.comment_belonging_request.format(comment_id=comment_id), (0, ))[0]
+        return post_author_id == self.user_id
 
     @property
     def get_posts(self) -> dict:
