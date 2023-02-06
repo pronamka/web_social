@@ -52,14 +52,13 @@ def check_integrity(stream) -> bool:
 
 def get_text(name: str) -> str:
     """Get text from a pdf file saved on disk."""
-    print(name)
     doc = PdfFileReader(name)
     text = ''
     for i in doc.pages:
         try:
             text += i.extract_text()
         except TypeError as e:
-            print(f'An error occurred: {e}; The piece of text will be excluded from search.')
+            print(f'An error has occurred: {e}; The piece of text will be excluded from search.')
     return text
 
 
@@ -114,7 +113,9 @@ class ArticleManager(FileManager):
 
     insert_article_request = 'INSERT INTO posts(user_id, title, date, display_date, ' \
                              'tags, raw_text) VALUES(?, ?, ?, ?, ?, ?);'
-    upload_path = 'static/upload_folder/'
+
+    insert_article_text_request = "UPDATE posts SET raw_text='{post_text}' WHERE post_id={post_id}"
+    upload_path = 'static/upload_folder/articles/'
     wkhtmltopdf_config = configuration(wkhtmltopdf='C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe')
     wkhtmltopdf_options = {'enable-local-file-access': True}
 
@@ -133,21 +134,31 @@ class ArticleManager(FileManager):
         saved and an entry made in database."""
         if conditions := self._check_conditions():
             return conditions
+        self._create_db_note()
+        self.filename = f'{self._get_post_id()}.{self._get_extension()}'
         self.full_path = os.path.join(self.upload_path, self.filename)
         self.protocols.get(self._get_extension())()
-        if error := self._insert_into_db():
+        if error := self._insert_article_text():
             return error
 
-    def _insert_into_db(self) -> None:
+    def _create_db_note(self) -> None:
+        DataBase(access_level=2).insert(self.insert_article_request, data=self._build_data_package())
+
+    def _get_post_id(self) -> int:
+        return DataBase().get_information(f'SELECT post_id FROM posts WHERE title="{self._new_filename(False)}"')[0]
+
+    def _insert_article_text(self) -> None:
         """Creates an entry in the database with the
         information about new post."""
-        DataBase(access_level=2).insert(self.insert_article_request, data=self._build_data_package())
+        request = self.insert_article_text_request.format(post_text=get_text(self._new_filename(full=True)),
+                                                          post_id=int(self.filename.split('.')[0]))
+        DataBase(access_level=3).update(request)
 
     def _build_data_package(self) -> tuple:
         """Prepare data that will be inserted in the database."""
         date = datetime.now()
         data_package = (self.user_id, self._new_filename(False), date.strftime('%Y-%m-%d'),
-                        date.strftime("%A, %d. %B %Y %H:%M"), self.tags, get_text(self._new_filename()))
+                        date.strftime("%A, %d. %B %Y %H:%M"), self.tags, '')
         return data_package
 
     def _check_conditions(self) -> Union[str, None]:
@@ -164,13 +175,15 @@ class ArticleManager(FileManager):
 
     def _immediate_save(self) -> Union[str, None]:
         """Just save a file (called when the file already has the right extension)."""
+
         if self._get_extension() == 'pdf' and check_integrity(self.file.stream) is False:
             #  self.file.stream is of type SpooledTemporaryFile
             return 'Sorry, we were unable to save your file. ' \
                    'This is likely because it was corrupted. ' \
                    'If it opens fine on your device, please contact ' \
                    'our tech support at defender0508@gmail.com'
-        self.file.save(self.full_path)
+        self.file.stream.seek(0)
+        self.file.save(dst=self.full_path)
 
     def _save_from(self) -> None:
         _actions = {'docx': self._convert_from_docx, 'html': self._convert_from_html}
