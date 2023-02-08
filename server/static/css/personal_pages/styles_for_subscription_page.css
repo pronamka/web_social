@@ -39,6 +39,8 @@
     max-width: 100px;
     min-width: 50px;
     vertical-align: top;
+    aspect-ratio: 1/1;
+    border-radius: 100%;
 }
 .made-ago{
     word-break: break-all;
