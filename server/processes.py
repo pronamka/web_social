@@ -18,7 +18,7 @@ from itsdangerous.exc import BadTimeSignature
 from server.app_core import app, users
 from server.database import DataBase
 from server.posts import AdminPostRegistry, UserPostRegistry, \
-    FullyFeaturedPost, CommentsRegistry
+    FullyFeaturedPost, CommentsRegistry, PostExtended
 from server.user import UserFactory, Viewer, Author, Admin, UserRole
 from server.managers import Manager
 from server.search_engine import Searcher
@@ -103,6 +103,7 @@ def author_required(func: Callable):
     """Check if the user that is trying to commit
     a certain action is an author."""
 
+    @wraps(func)
     def wrapper(*args):
         if get_user().get_role == UserRole.Viewer:
             return 0
@@ -125,30 +126,24 @@ def search_for(query: str, required_amount: int = 5, start_with=0, strictly: boo
     about them."""
     post_ids = Searcher.search(query, limit=required_amount, start_with=start_with,
                                strictly=strictly, interests=get_user().get_interests)
-    res = {'search_results': UserPostRegistry.get_posts_from_ids(post_ids[0]),
+    res = {'search_results': UserPostRegistry.get_posts_from_ids(post_ids[0], post_type=PostExtended),
            'searched_for': post_ids[1]}
     return dumps(res, cls=Encoder)
 
 
-def write_comment(post_id: int, comment_text: str, is_reply: int = None) -> None:
+def write_comment(post_id: int, comment_text: str, is_reply: int = None):
     """Add a comment to a certain post.
     :param post_id: the id of the post under which a comment was left.
     :param comment_text: the text of the comment.
-    :param is_reply: defines if the comment is a reply to another comment (it
+    :param is_reply: determines if the comment is a reply to another comment (it
     equals to 0 if it is not or to an id of another comment, if it is)."""
-    # May be will be added as a method to any class
-    # that represents a post or manager.
-    if is_reply:
-        post_id = DataBase().get_information(f'SELECT post_id FROM comments WHERE comment_id={is_reply}')[0]
-    cur_user_id = get_user().get_user_id
-    data_package = [post_id, comment_text, datetime.now().strftime("%A, %d. %B %Y %H:%M"),
-                    is_reply]
-    if is_reply and FullyFeaturedPost(int(post_id)).get_author_id == cur_user_id:
-        get_user().author_reply(*data_package)
+    current_user = get_user()
+    if is_reply and current_user.get_role == UserRole.Author and \
+            current_user.PostManager.check_comment_belonging(is_reply):
+        current_user.author_reply(post_id, comment_text, is_reply)
     else:
-        data_package.append(cur_user_id)
-        DataBase(access_level=2).insert(f'INSERT INTO comments(post_id, comment, date, is_reply, '
-                                        f'user_id) VALUES(?, ?, ?, ?, ?);', data=data_package)
+        current_user.add_comment(post_id, comment_text, is_reply)
+    return dumps(CommentsRegistry.find_comment(current_user.user_id, post_id, comment_text, is_reply), cls=Encoder)
 
 
 def check_password(user_id: int, password: str) -> bool:
@@ -164,6 +159,7 @@ class PostAnalyticsBuilder:
     standard_request = 'WITH list(post_id, title) AS (VALUES {values})\
                         SELECT post_id, title, IFNULL(COUNT(user_id), 0) AS amount\
                         FROM list LEFT JOIN {table_name} USING (post_id) GROUP BY post_id;'
+
     over_time_request = 'WITH l(user_id, created_on) AS (SELECT user_id, created_on FROM {table_name} ' \
                         'WHERE post_id IN {post_ids}), list(created_on) AS (VALUES {dates}) ' \
                         'SELECT created_on, IFNULL(COUNT(user_id), 0) AS amount ' \
@@ -179,7 +175,7 @@ class PostAnalyticsBuilder:
 
     @classmethod
     def _get_any(cls, query: str, properties: list[str]) -> list[tuple]:
-        """Get a list of tuples containing any information specified in properties.
+        """Get a list of tuples containing any information specified in query.
         Used to apply the same sql query to multiple tables in cases where JOIN is not
         suitable.
         :param query: an sql query, that contains the substring: `{}`; it will be formatted
@@ -191,11 +187,13 @@ class PostAnalyticsBuilder:
             yield cls.database.get_all(query.format(i))
 
     @classmethod
-    def views_likes_comments(cls, user_id, limit: int = 30, offset: int = 0) -> dict[str: list]:
+    def on_post_activity(cls, user_id, limit: int = 30, offset: int = 0) -> dict[str: list]:
         """Get the amount of views, likes, comments on each of the latest posts in
         range, specified by limit and offset."""
         analytics = {'views': [], 'likes': [], 'comments': []}
         all_info: list = cls._get_posts(user_id, limit, offset)
+        if not all_info:
+            return analytics
         req = cls.standard_request.format(values=str(all_info).removeprefix('[').removesuffix(']'),
                                           table_name='{}')
         views, likes, comments = cls._get_any(req, ['post_views', 'post_likes', 'comments'])
@@ -213,7 +211,7 @@ class PostAnalyticsBuilder:
 
     @classmethod
     def _get_each_day(cls, limit: int = 30, offset: int = 0) -> str:
-        """Get dates in range from today - offset to today - offset - limit,
+        """Get dates in range from (today - offset) to (today - offset - limit),
         in format `('YYYY-MM-DD'), ('YYYY-MM-DD')`.
         This format is need to present data in the form that sqlite's temporary
         tables use."""
@@ -225,12 +223,18 @@ class PostAnalyticsBuilder:
         return all_dates.removesuffix(', ')
 
     @classmethod
-    def activity_over_time(cls, user_id, limit: int = 30, offset: int = 0) -> dict[str: list]:
+    def over_time_activity(cls, user_id, limit: int = 30, offset: int = 0) -> dict[str: list]:
         """Get the amount of views, likes, comments on all user's posts on each
         day in range specified by limit and offset."""
         analytics = {'views': [], 'likes': [], 'comments': []}
+        days = cls._get_each_day(limit, offset)
+        last_requested_date = datetime.strptime(days.rsplit("('")[1].removesuffix("'), "), '%Y-%m-%d')
+
+        # if user requesting info from six month ago or older, return empty analytics
+        if last_requested_date < (datetime.now() - timedelta(weeks=30)):
+            return analytics
         req = cls.over_time_request.format(post_ids=str(cls._get_all_post_ids(user_id)),
-                                           table_name='{}', dates=cls._get_each_day(limit, offset))
+                                           table_name='{}', dates=days)
         views, likes, comments = cls._get_any(req, ['post_views', 'post_likes', 'comments'])
         for view, like, comment in zip(views, likes, comments):
             analytics.get('views').append({'x': view[0], 'y': view[1]})
@@ -261,10 +265,11 @@ class InformationGetter:
                           'latest_posts': self.get_latest_posts,
                           'dated_posts': self.get_dated_posts,
                           'latest_comments': self.get_latest_comments_or_replies,
-                          'latest_comments_dev': self.get_latest_comments_on_users_posts,
+                          'comments_for_authors': self.get_latest_comments_on_users_posts,
                           'interests': self.get_interests,
                           'avatar': self.get_avatar,
-                          'analytics': self.get_analytics}
+                          'analytics': self.get_analytics,
+                          'overall_user_post_statistics': self.get_overall_post_statistics}
 
     def get_full_data(self) -> dict:
         """Get all the data that was specified
@@ -292,11 +297,18 @@ class InformationGetter:
                     for position, item in enumerate(parameter_keys))
         return res
 
+    def get_overall_post_statistics(self):
+        if self.user.get_role.value < 2:
+            return 0
+        else:
+            return self.user.PostManager.get_overall_amounts(['views', 'likes', 'comments'])
+
     def get_analytics(self) -> dict[str: list]:
-        analytics_protocols = {'activity': PostAnalyticsBuilder.activity_over_time,
-                               'views_likes_comments': PostAnalyticsBuilder.views_likes_comments}
+        analytics_protocols = {'over_time_activity': PostAnalyticsBuilder.over_time_activity,
+                               'on_post_activity': PostAnalyticsBuilder.on_post_activity
+                               }
         analytics_required = self._get_from_parameters({'chart': 'views_likes_comments',
-                                                        'limit': 30, 'offset': 0})
+                                                        'required': 30, 'loaded': 0})
         return analytics_protocols.get(analytics_required[0])(self.user.get_user_id, *analytics_required[1:3])
 
     def get_avatar(self) -> str:
@@ -318,20 +330,21 @@ class InformationGetter:
         return CommentsRegistry.fetch_(content_type, post_id, amount, start_with)
 
     def get_latest_comments_on_users_posts(self) -> list:
-        amount, start_with = self.parameters.get('comments_required'), \
-                             self.parameters.get('comments_loaded')
-        return self.user.PostManager.get_latest_comments(amount, start_with)
+        amount, start_with, status = self._get_from_parameters(
+            {'comments_required': 0, 'comments_loaded': 0, 'comment_status': 0})
+        return self.user.PostManager.get_latest_comments(amount, start_with, status)
 
     def get_latest_posts(self) -> Union[int, tuple[FullyFeaturedPost], list[FullyFeaturedPost]]:
-        amount, start_with, of_user = self.parameters.get('posts_required', 1), \
-                                      self.parameters.get('posts_loaded', 0), \
-                                      self.parameters.get('of_user', True)
+        """Get any posts. Specific instructions are retrieved
+        from parameters passed to the class constructor."""
+        amount, start_with, of_user, post_type = self._get_from_parameters(
+            {'posts_required': 1, 'posts_loaded': 0, 'of_user': True, 'post_type': 1})
         if of_user and self.user.get_role == UserRole.Viewer:
             return 0
         elif of_user:
-            return self.user.PostManager.get_latest_posts(amount, start_with)
+            return self.user.PostManager.get_latest_posts(amount, start_with, post_type=post_type)
         else:
-            return UserPostRegistry.get_posts(amount, start_with, {'verified': True})
+            return UserPostRegistry.get_posts(amount, start_with, {'verified': True}, post_type=post_type)
 
     @author_required
     def amount_of_commentaries_received_on_post(self) -> int:
@@ -339,9 +352,12 @@ class InformationGetter:
 
     @author_required
     def amount_of_posts(self) -> int:
+        """Get the amount of post user made."""
         return self.user.PostManager.get_post_amount()
 
     def get_dated_posts(self) -> list:
+        """Get the posts of the people the current user
+        is subscribed to, sort them by date."""
         amount, start_with, post_type = self._get_from_parameters({'posts_required': 1, 'posts_loaded': 0,
                                                                    'post_type': 1})
         follows = fol if len((fol := self.user.SubscriptionManager.get_follows)) >= 2 else list(fol).append(0)
@@ -366,9 +382,10 @@ class InformationLoader:
             'hub': {'latest_posts': 'object',
                     'commentaries_received': 'amount',
                     'post_amount': 'object',
-                    'subscribers': 'amount'},
+                    'subscribers': 'amount',
+                    'overall_user_post_statistics': 'object'},
             'content': {'latest_posts': 'object'},
-            'comment_section': {'latest_comments_dev': 'object'},
+            'comment_section': {'comments_for_authors': 'object'},
             'personal_data': {'interests': 'object', 'avatar': 'object'},
             'analytics': {'analytics': 'object'}}
         data = InformationGetter(protocols.get(params.get('page')),
