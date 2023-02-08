@@ -418,7 +418,7 @@ summary[id='All interests']:hover{
     margin-left: max(30px, 2vw)
 }
 
-#content #show-upload-dilog-button{
+#content #show-upload-dialog-button{
     display: block;
     width: 20vw;
     border-radius: 3px;
