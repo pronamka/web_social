@@ -1,169 +1,166 @@
-@font-face {
-  font-family: "centurygothic";
-  font-style: normal;
-  font-weight: 400;
-  src: local("centurygothic"),
-       url("/fonts/centurygothic.ttf") format("ttf"),
-       url("/fonts/centurygothic.ttf") format("ttf");
-}
-@media (max-width: 20000px){
-	.container{
-		width: 480px;
-		margin-top: 50px;
-		margin-left: -4px;
-		display: inline-block;
-	}
-	.container p{
-		margin-left: 53px;
-	}
-	#logo_container{
-		display: inline-block;
-		width: 700px;
-		margin-left: 200px;
-		margin-top: 50px;
-	}
-	#create_account_button{
-		margin-top: 5px;
-		margin-left: 31px;
-	}
-@media (max-width: 2000px){
-	.container{
-		width: 480px;
-		margin-top: 50px;
-		margin-left: -4px;
-		display: inline-block;
-	}
-	.container p{
-		margin-left: 53px;
-	}
-	#logo_container{
-		display: inline-block;
-		width: 700px;
-		margin-left: 200px;
-		margin-top: 50px;
-	}
-	#create_account_button{
-		margin-top: 5px;
-		margin-left: 31px;
-	}
-@media (max-width: 1200px){
-	.container{
-		width: 70%;
-		margin-left: auto;
-		margin-right: auto;
-		display: block;
-		margin-top: -20px;
-	}
-	#logo_container{
-		width: 70%;
-		margin-left: auto;
-		margin-right: auto;
-		display: block;
-	}
-}
-@media (max-width: 767px){
-	.container{
-		width: 90%;
-		margin-top: -20px;
-		margin-left: auto;
-		margin-right: auto;
-	}
-	#logo_container{
-		width: 90%;
-		margin-left: auto;
-		margin-right: auto;
-	}
-}
-@media (max-width: 500px){
-	.container{
-		width: 90%;
-		margin-top: -20px;
-		margin-left: auto;
-		margin-right: auto;
-	}
-	.container i{
-		display: none;
-	}
-	.in_content{
-		margin-left: 5%;
-		margin-right: 5%;
-	}
-	#create_account_button{
-		margin-top: 5px;
-		margin-right: 5%;
-		margin-left: 6%;
-	}
-	#logo_container{
-		width: 90%;
-		margin-left: auto;
-		margin-right: auto;
-	}
-	.container p{
-		margin-left: 5%;
-		margin-right: 5%;
-		text-align: center;
-	}
-}
-@media (max-width: 350px){
-	#create_account_button{
-		margin-top: 5px;
-		margin-right: 5%;
-		margin-left: 9%;
-	}
-}
+
+
 body{
-	background-image: url(backgrounds/geometric_background.jpg);
-	width: auto;
-	height: auto;
-}
-.container{
-	max-width: 10000px;
-	background-color: white;
-	align-items: center;
-	font-family: 'centurygothic';
-	height: 400px;
-	vertical-align: top;
-}
-.container h2{
-	margin-left: 20px;
-	padding-top: 10px;
+	font-family: 'Roboto', 'Noto', sans-serif;
 }
 
-.container i{
-	margin-left: 10px;
+#create-account-icon-wrapper{
+	font-size: xx-large;
+	display: inline-block;
+	vertical-align: baseline;
+	color: rgb(20 57 255);
 }
+
+#container{
+	display: flex;
+	margin-right: auto;
+	margin-left: auto;	
+	margin-top: auto;
+	margin-bottom: auto;
+    border: var(--container-border-outside);
+    border-radius: 20px;
+	width: 70%;
+	transform: translateY(50%);
+}
+
+#container-left-info {
+    margin-right: var(--container-left-info-margin-right);
+	padding-top: 2%;
+	
+	border-top-left-radius: 18px;
+	border-bottom-left-radius: 18px;
+    border-right: var(--container-border-inside);
+    display: flex;
+    flex-direction: column;
+    align-content: stretch;
+    justify-content: flex-start;
+    align-items: flex-start;
+	width: var(--container-left-info-width);
+	background-color: var(--info-left-background-color);
+}
+
+#info-left-container-wrapper{
+	margin-left: 3%;
+}
+
+#company-name{
+	display: inline-block;
+	vertical-align: super;
+	margin-left: 2%;
+}
+
+#compay-tagline{
+	display: block;
+	font-style: italic;
+	width: fit-content;
+}
+
+#company-description-wrapper{
+	margin-bottom: 2vh;
+	margin-right: 2vw;
+	font-size: large;
+}
+
+#credentials{
+	display: flex;
+	flex-direction: column;
+	width: 40%;
+	margin-top: 2%;
+	align-content: center;
+	justify-content: space-evenly;
+}
+
+#company-logo{
+	width: 20%;
+	max-width: 80px;
+	border-radius: 10%;
+	margin-right: auto;
+	margin-left: auto;
+	margin-bottom: 1%;
+	padding-bottom: 2%;
+}
+
 .info{
-	margin: 2px;
-	height: 40px;
-	width: 80%;
-	margin-left: 20px;
-}
-#create_account_button{
-	width: 81%;
-	height: 30px;
+	width: var(--credentials-input-width);
+	height: var(--credentials-input-height);
+	border-radius: 7px;
+	background-color: var(--credentials-input-background-color);
+	box-sizing: border-box;
+	border: none;
+	margin-top: 1%;
+	text-indent: 3%;
 	font-size: large;
-	color: whitesmoke;
-	background-color: #4682B4;
+	font-family: centurygothic;
+	padding-top: 2%;
+	padding-bottom: 2%;
 }
-#create_account_button:hover{
-	background-color: #0000CD;
+.info:focus{
+	outline: var(--credentials-input-outline);
+	box-shadow: 1px 1px 1px ;
+}
+
+#create-account-button{
+	width: var(--credentials-input-width);
+	height: var(--credentials-input-height);
+	background-color: var(--log-in-button-background-color);
+	border: none;
+	border-radius: 7px;
+	margin-top: 2%;
+	color: var(--log-in-button-text-color);
+	font-size: large; 
+}
+#create-account-button:hover{
 	cursor: pointer;
+	background-color: var(--log-in-button-hover-background-color)
 }
-#logo_container{
-	background-color: lightblue;
-	max-width: 70000px;
-	height: 400px;
+
+#company-name-mobile{
+	display: none;
 }
-#logo_container p{
-	margin-left: 10%;
-	padding-top: 10px;
-	text-decoration: underline;
-	text-shadow: 2px;
-	font-size: x-large;
-	font-family: 'centurygothic';
+
+@media(max-width: 1250px){
+	:root{
+		--container-left-info: 100%;
+		--container-left-info-margin-right: 0%;
+	}
+	#container{
+		flex-direction: column-reverse;
+	}
+	#container-left-info{
+		width: 100%;
+		border-top-left-radius: 0px;
+		border-bottom-left-radius: 18px;
+		border-bottom-right-radius: 18px;
+		border-top: var(--container-border-inside);
+		border-right: 0px solid grey;
+	}
+	#credentials{
+		width: 100%;
+		
+		flex-wrap: wrap;
+		align-items: center;
+	}
+	#container{
+		transform: none;
+	}
 }
-#logo_container li{
-	font-size: large;
-	margin-top: 10px;
-	font-family: 'centurygothic';
+@media(max-width: 600px){
+	#container-left-info{
+		display: none;
+	}
+	#container{
+		width: 100%;
+		border: none;
+	}
+	#company-name-mobile{
+		display: block;
+	}
+}
+
+
+#validation-errors-info{
+	font-size: larger;
+	display: block;
+	width: var(--credentials-input-width);
+	text-align: center;
 }
