@@ -155,9 +155,11 @@ class Searcher:
 
     @classmethod
     def calculate_search_score(cls, user_interests: dict, posts: list) -> list:
-        """Calculate how many points each post, fetched earlier, gets,
+        """Calculate how many points each post (fetched earlier) gets,
         depending on the amount of word appearances it has, and it's tags similarity
-        to the user interests."""
+        to the users' interests."""
+        if not posts:
+            return []
         res = {i[0]: 0 for i in posts}
         points_for_words = 10**(len(str(posts[0][1][1]))-1)
         for i in posts:
