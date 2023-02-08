@@ -30,12 +30,7 @@ function getPosts(){
 function buildPosts(post_dict){
     for (var i=0, l=Object.keys(post_dict).length; i<=l; i++){
         try{
-            title = post_dict[i]['title'];
-            author = post_dict[i]['author'];
-            post_id = post_dict[i]['post_id'];
-            path = '/static/upload_folder/'+title;
-            author_avatar = post_dict[i]['author_avatar']
-            post = buildHTML(path, author, title, post_id, author_avatar);
+            post = buildHTML(post_dict[i]);
             addPost(post);
         }
         catch(error){
@@ -43,17 +38,18 @@ function buildPosts(post_dict){
         }
     }
 }
-function buildHTML(path, author, title, post_id, author_avatar){
+function buildHTML(post){
+    path = `/static/upload_folder/articles/${post['post_id']}.pdf`
     html = `<object class="table_cell">
-            <iframe class="preview" src=${path} id="post_preview ${post_id}"></iframe>
+            <iframe class="preview" src=${path} id="post_preview ${post['post_id']}"></iframe>
             <div class="post-short-information">
                 <div class='title-and-avatar-wrapper'>
-                    <img class="author-avatar" src="static/${author_avatar}">
+                    <img class="author-avatar" src="static/${post['author_avatar']}">
                     <p class="post-name">
-                        <a href="/view_post/?post_id=${post_id}" class="post-link" id="post ${post_id}">${title}</a>
+                        <a href="/view_post/?post_id=${post['post_id']}" class="post-link" id="post ${post['post_id']}">${post['title']}</a>
                     </p>
                 </div>
-                <p class="author-name">by `+ author+`</p>
+                <p class="author-name">by ${post['author']}</p>
             </div>
             </object>`
             ;
