@@ -1,0 +1,42 @@
+@font-face{
+	font-family: "centurygothic";
+	font-style: normal;
+	font-weight: 400;
+	src: local("centurygothic"),
+		url("/fonts/centurygothic.ttf") format("ttf"),
+		url("/fonts/centurygothic.ttf") format("ttf");
+}
+
+:root{
+	--credentials-input-width: 90%;
+	--credentials-input-height: 20%;
+	--container-inner-parts: 40%;
+
+	--container-left-info-width: 50%;
+	--container-left-info-margin-right: 5%;
+}
+
+:root, :root.light_theme{
+	--info-left-background-color: #f9f9f9;
+
+	--credentials-input-outline: 1px solid rgb(22, 105, 132);
+	--credentials-input-background-color: #f2f3f5;
+	--credentials-input-box-shadow: rgb(39, 12, 157);
+	
+	--container-border-inside: 1px solid lightblue;
+	--container-border-outside: 1px solid lightgrey;
+
+	--log-in-button-background-color: #2d81e0;
+	--log-in-button-text-color: white;
+	--log-in-button-hover-background-color: rgb(20, 20, 145);
+
+	--password-restoration-link-color: rgb(0, 0, 0);
+
+	--password-restoration-dialog-border: 1px solid lightblue;
+
+	--restore-password-button-background-color: #088138;
+
+	--cancel-password-restoration-button-color:  white;
+	--cancel-password-restoration-button-background-color: black;
+}
+
