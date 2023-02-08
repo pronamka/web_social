@@ -17,30 +17,30 @@
         </div>
         <div id="post-information-wrapper">
             <h2 id="post-title">{{ post.title }}</h2>
-            <button id="like-btn" onclick="like_btn.changeStatus()">Like</button>
-            <div id="views-and-likes-info">
-                <p id="views-amount">{{ post.views_amount }} views</p>
-                <p id="likes-amount">{{ post.likes_amount }} likes</p>
-            </div>
+            <p id="views-amount">{{ post.views_amount }} views</p>
+            <button id="like-btn" onclick="like_btn.changeStatus()"></button>
             <p><em>{{ post.made_ago_str }}</em></p>
         </div>
         <div id="leave_comment">
-            <textarea placeholder="Your comment" id="comment"></textarea>
+            <textarea placeholder="Your comment" id="comment-input"></textarea>
             <button id="send_comment_btn" onclick="sendComment('{{post.get_id}}');">
                 Send Comment
             </button>
         </div>
         <div id="all-comments">
             <div id="comments_dv"></div>
-            <button onclick="loadComments()" id="load_comments_btn">See more</button>
+            <button onclick="loadComments()" id="load-comments-button">See more</button>
         </div>
     </div>
 </div>
 <script>
     const post_id = '{{post.get_id}}'
     const author_id = '{{post.get_author_id}}'
-    var current_status = "{{ liked }}"
-    var current_status = "{{ is_subscribed }}"
+    var likes_amount = Number('{{ post.likes_amount }}')
+    var views_amount = Number('{{ post.views_amount }}')
+    var subscribers_amount = Number('{{ post.get_subscribers_amount }}')
+    var is_liked = "{{ liked }}"
+    var is_subscribed = "{{ is_subscribed }}"
 </script>
 <script src="{{ url_for('static', filename='js/post_page.js') }}"></script>
 {% endblock %}
