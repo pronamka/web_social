@@ -45,6 +45,7 @@
     max-width: 60px;
     min-width: 40px;
     vertical-align: middle;
+    aspect-ratio: 1/1;
 }
 
 .post-link{
