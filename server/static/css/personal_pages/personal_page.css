@@ -127,6 +127,11 @@ summary{
     margin-top: 0px;
 }
 
+details[id='details All interests']{
+    height: 50vh;
+    overflow-y: scroll
+}
+
 summary[id='All interests']:hover{
     padding-bottom: 1vh;
     box-shadow: 2px 2px 8px 0px grey;
