@@ -3,14 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <title>Confirm your email</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/variables.css')}} ">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/email_pages/confirm_email.css')}} ">
 </head>
 <body>
-    <h2>Thank you for registering</h2>
-    <p>We have sent a letter to your email.<br>
-    Please, follow the link in it to confirm your address.</p>
-    <p>Didn't receive a letter?</p>
-    <button onclick="resend_email()">Send again</button>
-    <p><a href="/log_in_page">Log in</a></p>
+    <div id="page-wrapper">
+        <h2>Thank you for registering</h2>
+        <p>
+            We have sent a letter to your email.
+            Please, follow the link in it to confirm your address.
+        </p>
+        <p>Didn't receive a letter?</p>
+        <button onclick="resend_email()" id="resend-email-button">Send again</button>
+        <p><a href="/log_in_page">Log In</a></p>
+    </div>
     <script>
         function resend_email(){
             fetch('/resend_confirmation_email/{{login}}', {method: 'GET'}).then(resp =>{
