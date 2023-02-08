@@ -28,6 +28,8 @@
 
 .avatar{
     width: 40%;
+    aspect-ratio: 1/1;
+    border-radius: 100%;
 }
 
 #log-out-btn{
@@ -83,6 +85,7 @@
 	width: 100%;
     padding: 2%;
 }
+
 .nav button:hover{
 	border: 0px solid whitesmoke;
 	background-color: black;
@@ -91,10 +94,14 @@
 	font-size: larger;
 	width: 100%;
 }
+
 .nav button>a{
 	text-decoration: none;
     color: black;
 }
+
+
+
 @media (max-width: 3000px){
     .nav{
         width: 250px;
@@ -109,6 +116,7 @@
         transform: translateX(250px);
     }
 }
+
 @media (max-width: 600px){
     .nav{
         width: 50%;
@@ -125,6 +133,7 @@
         margin-left: 3%;
     }
 }
+
 @media (max-width: 475px){
     .nav{
         width: 90%;
@@ -141,6 +150,7 @@
         margin-left: 1%;
     }
 }
+
 @media (max-width: 384px){
     .nav{
         width: 90%;
@@ -157,112 +167,67 @@
         margin-left: 1%;
     }
 }
-/**
- * Переключаемая боковая панель навигации
- * выдвигающаяся по клику слева
- */
+
+
+
 .nav {
-    /*  ширна произвольная, не стесняйтесь экспериментировать */
-
-
-    /* фиксируем и выставляем высоту панели на максимум */
     height: 100%;
     position: fixed;
     top: 0;
     bottom: 0;
     margin: 0;
-    /* сдвигаем (прячем) панель относительно левого края страницы */
-    
-    /* внутренние отступы */
     padding: 15px 20px;
-    /* плавный переход смещения панели */
     -webkit-transition: left 0.3s;
     -moz-transition: left 0.3s;
     transition: left 0.3s;
-    /* определяем цвет фона панели #16a085*/
     background: white;
-    /* поверх других элементов */
     z-index: 2000;
     scroll-behavior: smooth;
     overflow-x: scroll;
     box-shadow: 0px 0px 7px grey;
 }
-/**
- * Кнопка переключения панели
- * тег <label>
- */
+
 
 .nav-toggle {
-    /* абсолютно позиционируем */
     position: absolute;
-    /* относительно левого края панели */
-
-    /* отступ от верхнего края панели */
     top: 1em;
-    /* внутренние отступы */
     padding: 0.5em;
-    /* определяем цвет фона переключателя
-     * чаще вчего в соответствии с цветом фона панели
-    */
     background: inherit;
-    /* цвет текста */
     color:  black;
-    /* вид курсора */
     cursor: pointer;
-    /* размер шрифта */
     font-size: 1.2em;
     line-height: 1;
-    /* всегда поверх других элементов страницы */
     z-index: 2001;
-    /* анимируем цвет текста при наведении */
     -webkit-transition: color .25s ease-in-out;
     -moz-transition: color .25s ease-in-out;
     transition: color .25s ease-in-out;
 }
  
-/* определяем текст кнопки 
- * символ Unicode (TRIGRAM FOR HEAVEN)
-*/
- 
+
 .nav-toggle:after {
     content: '\2630';
     text-decoration: none;
 }
  
-/* цвет текста при наведении */
- 
+
 .nav-toggle:hover {
     color: #800000;
 }
  
-/**
- * Скрытый чекбокс (флажок)
- * невидим и недоступен :)
- * имя селектора атрибут флажка
- */
- 
+
 [id='nav-toggle'] {
     position: absolute;
     display: none;
 }
  
-/**
- * изменение положения переключателя 
- * при просмотре на мобильных устройствах
- * когда навигация раскрыта, распологаем внутри панели
-*/
- 
+
 [id='nav-toggle']:checked ~ .nav > .nav-toggle {
     left: auto;
     right: 2px;
     top: 1em;
 }
  
-/**
- * Когда флажок установлен, открывается панель
- * используем псевдокласс:checked
- */
- 
+
 [id='nav-toggle']:checked ~ .nav {
     left: 0;
     box-shadow:4px 0px 20px 0px rgba(0,0,0, 0.5);
@@ -270,31 +235,21 @@
     -webkit-box-shadow:4px 0px 20px 0px rgba(0,0,0, 0.5);
 }
  
-/* 
- * смещение контента страницы
- * на размер ширины панели,
- * фишка необязательная, на любителя
-*/
- 
 
- 
-/*
- * изменение символа переключателя,
- * привычный крестик (MULTIPLICATION X), 
- * вы можете испльзовать любой другой значок
-*/
- 
 [id='nav-toggle']:checked ~ .nav > .nav-toggle:after {
     content: '\2715';
 }
- 
-/**
- * профиксим баг в Android <= 4.1.2
- * см: http://timpietrusky.com/advanced-checkbox-hack
- */
+
  
 body {
+    animation: bugfix infinite 1s;
     -webkit-animation: bugfix infinite 1s;
+}
+
+@keyframes bugfix{
+    to {
+        padding: 0;
+    }
 }
  
 @-webkit-keyframes bugfix {
@@ -302,12 +257,8 @@ body {
       padding: 0;
     }
 }
- 
-/**
- * позаботьтимся о средних и маленьких экранах
- * мобильных устройств
- */
- 
+
+
 @media screen and (min-width: 320px) {
     html,
     body {
@@ -319,7 +270,6 @@ body {
 
  
 /**
- * Формируем стиль заголовка (логотип) панели 
  *     html,
     body {
       margin: 0;
@@ -348,7 +298,6 @@ body {
     width: 90%;
     padding: 0;
     margin: 10px 0;
-    text-shadow: rgba(255, 255, 255, .1) -1px -1px 1px, rgba(0, 0, 0, .5) 1px 1px 1px;
     font-size: 1.3em;
     line-height: 1.3em;
     opacity: 0;
@@ -373,8 +322,7 @@ body {
 }
  
  
-/*плавное появление заголовка (логотипа) при раскрытии панели */
- 
+
 [id='nav-toggle']:checked ~ .nav h2 {
     opacity: 1;
     transform: scale(1, 1);
@@ -383,11 +331,7 @@ body {
     -webkit-transform: scale(1, 1);
 }
  
-/**
- * формируем непосредственно само меню
- * используем неупорядоченный список для пунктов меню
- * прикрутим трансфомации и плавные переходы
- */
+
 .nav > ul {
     display: block;
     margin: 0;
@@ -416,8 +360,7 @@ body {
     transform: translateX(0);
 }
  
-/* определяем интервалы появления пунктов меню */
- 
+
 .nav > ul > li:nth-child(2) {
     -webkit-transition: opacity .5s .2s, -webkit-transform .5s .2s;
     transition: opacity .5s .2s, transform .5s .2s;
@@ -449,10 +392,7 @@ body {
 }
  
  
-/**
- * оформление ссылок пунктов меню
- */
- 
+
 .nav > ul > li > a {
     display: inline-block;
     position: relative;
@@ -463,25 +403,19 @@ body {
     color: #dadada;
     width: 100%;
     text-decoration: none;
-    /* плавный переход */
     -webkit-transition: color .5s ease, padding .5s ease;
     -moz-transition: color .5s ease, padding .5s ease;
     transition: color .5s ease, padding .5s ease;
 }
  
-/**
- * состояние ссылок меню при наведении
- */
+
  
 .nav > ul > li > a:hover,
 .nav > ul > li > a:focus {
     color: white;
     padding-left: 15px;
 }
- 
-/**
- * линия подчеркивания ссылок меню
- */
+
  
 .nav > ul > li:before {
     content: '';
@@ -508,11 +442,7 @@ body {
     transition: width .5s ease;
 }
  
-/**
- * анимируем линию подчеркивания 
- * ссылок при наведении
- */
- 
+
 .nav > ul > li:hover:before {
     width: 0%;
     background: #3bc1a0;
