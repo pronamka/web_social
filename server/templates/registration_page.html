@@ -4,65 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PronamkaScience</title>
-    <link rel='stylesheet' type="text/css" href="{{ url_for('static',  filename='css/n.css') }}">
+    <link rel='stylesheet' type="text/css" href="{{ url_for('static',  filename='css/variables.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/fontawesome-free-6.2.0-web/css/all.min.css')}}">
+    <link rel='stylesheet' type="text/css" href="{{ url_for('static',  filename='css/styles_for_registration_page.css') }}">
     <meta name="viewport" content="width=device-width">
 </head>
 <body>
-<div class="wrapper_weblogins">
-    <div class="container">
-        <div id="app_info">
-            <img src="{{ url_for('static',  filename='images/pronamka.ico') }}" id="app_logo">
-            <h3 style="display: inline-block;">PronamkaScience</h3>
+    <div id="container">
+        <div id="container-left-info">
+            <div id="info-left-container-wrapper">
+                <div>
+                    <div id="create-account-icon-wrapper"><i class="fa-solid fa-user-plus"></i></div>
+                    <h1 id="company-name">PronamkaScience</h1>
+                </div>
+                <h2>Create an account</h2>
+                <div id="compay-tagline"><h3 id="near_image">Some catchy phrase</h3></div>
+                <div id="company-description-wrapper">
+                    <p>
+                        Lorem ipsum dolor sit amet consectetur adipisicing elit. 
+                        Suscipit in quidem praesentium commodi expedita id inventore 
+                        odit illo perferendis sunt aut, dignissimos ratione ab consequuntur. 
+                        Dolorum repudiandae totam ad et?
+                    </p>
+                </div>
+            </div>
         </div>
-        <div id="inputs">
-            <h2>Create an account</h2>
-            <i class="fa-solid fa-user"></i>
-            <input name="login" placeholder="login" type="text" class="info" id="login"><br>
-            <i class="fa-solid fa-lock"></i>
-            <input name="password" placeholder="password" type="password" class="info" id="password"><br>
-            <i class="fa-solid fa-envelope-open"></i>
-            <input name="email" placeholder="email" type="email" class="info" id="email"><br>
-            <button onclick="sendData();" id="create_account_button">Submit</button>
-            <p id="validation_errors">{{errors}}</p>
-            <p>Already have an account? <a href="/log_in_page">Log in</a></p>
-        </div>
-        
-    </div>
-</div>
-<script>
-    function sendRequest(method, url, body, multipart=false) {
-        const headers = {'Content-Type': 'application/json'}
-            return fetch(url, {
-                method: method,
-                body: JSON.stringify(body),
-                headers: headers}).then(response => {
-                return response.text();
-        })
-    }
-    function sendData(){
-        const login = document.getElementById('login').value;
-        const email = document.getElementById('email').value;
-        const password = document.getElementById('password').value;
-        if (login == '' | email == '' | password == ''){
-            document.getElementById('validation_errors').innerHTML='Please, fill in all the fields.';
-            return false;
-        }
-        else{
-            sendRequest('POST', '/register/', 
-            {'login': login, 'password': password, 'email': email}).then(resp =>{
-                const response = JSON.parse(resp)
-                const status = response['status']
-                if (status == 406){
-                    document.getElementById('validation_errors').innerHTML=response['error'];
-                }
-                else if (status == 300) {
-                    alert('We have sent a confirmation email to you. Please, check it.');
-                    window.location.replace(response['redirect'])
-                }
-            })
-        }
-    }
-</script>
 
+        <div id="credentials">
+            <img src="{{ url_for('static', filename='images/pronamka_logo.png') }}" id="company-logo">
+            <h2 id="company-name-mobile">PronamkaScience</h2>
+            <input placeholder="login" type="text"  class="info" id="login">
+            <input placeholder="password" type="password" class="info" id="password">
+            <input placeholder="email" type="email" class="info" id="email">
+            <button id="create-account-button">Register</button>
+            <p id="validation-errors-info"></p>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/jquery.js')}}"></script>
+    <script src="{{ url_for('static', filename='js/registration_page.js')}}"></script>
 </body>
 </html>
