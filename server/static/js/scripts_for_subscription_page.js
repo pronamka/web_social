@@ -40,14 +40,7 @@ function buildPosts(posts){
                     addHTML('<div class="ln-dates-sep"></div>')
                     settings['last_date'] = posts[i]['creation_date']
                 }
-                title = posts[i]['title'];
-                author = posts[i]['author'];
-                post_id = posts[i]['post_id'];
-                author_avatar = posts[i]['author_avatar']
-                date = posts[i]['made_ago_str']
-                tags = buildTagsRepresentation(posts[i]['tags_flattened'])
-                path = '/static/upload_folder/'+title;
-                post = buildHTML(path, author, title, post_id, date, author_avatar, tags);
+                post = buildHTML(posts[i]);
                 addHTML(post);
             }
             catch(error){
@@ -57,25 +50,26 @@ function buildPosts(posts){
     }
 }
 
-function buildHTML(path, author, title, post_id, date, author_avatar, tags){
+function buildHTML(post){
+    path = `/static/upload_folder/articles/${post['post_id']}.pdf`
     html = `<object class="table_cell">
                 <iframe class="preview" src="${path}"></iframe>
                 <div class='all-post-info'>
-                    <img class="author-avatar" src="/static/${author_avatar}">
+                    <img class="author-avatar" src="/static/${post['author_avatar']}">
                     <div class="post-short-information">
                         <div class="title-and-author">
                             <p class="post-name">
-                                <a href="/view_post/?post_id=${post_id}">${title}</a>
+                                <a href="/view_post/?post_id=${post['post_id']}">${post['title']}</a>
                             </p>
-                            <p class="person_name">${author}</p>
+                            <p class="person_name">${post['author']}</p>
                         </div>
-                        <p class="made-ago">${date}</p>
+                        <p class="made-ago">${post['made_ago_str']}</p>
                     </div>
                     <div class='post-tags'>
                         <details>
                             <summary>Post tags</summary>
                             <ul>
-                                ${tags}
+                                ${buildTagsRepresentation(post['tags_flattened'])}
                             </ul>
                         </details>
                     </div>
