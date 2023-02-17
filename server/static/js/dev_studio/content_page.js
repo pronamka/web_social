@@ -1,7 +1,30 @@
 function buildPosts(post_dict){
-    for (var i=0, l=Object.keys(post_dict).length-1; i<=l; i++){
-        post = buildHTML(post_dict[i]);
-        insertHTML('#my_posts', post);
+    for (var i=0, l=post_dict.length; i<l; i++){
+        var post = post_dict[i];
+        const post_id = post['post_id'];
+        insertHTML('#my_posts', buildHTML(post));
+        $(`#delete-post-button-${post_id}`).on('click',  ()=>{
+            deletePostDialog(post_id);
+        })
+
+        $(`#toggle-preview-button-${post_id}`).on('click', ()=>{
+            togglePreview(post_id);
+        })
+    }
+}
+
+function togglePreview(post_id){
+    path = `/static/upload_folder/`
+    const elem = document.getElementById(`post-iframe-${post_id}`)
+    var current_state = elem.getAttribute('preview_state')
+
+    if(current_state=='preview'){
+        elem.setAttribute('src', path+`articles/${post_id}.pdf`)
+        elem.setAttribute('preview_state', 'article')
+    }
+    else{
+        elem.setAttribute('src', path+`previews/${post_id}.jpeg`)
+        elem.setAttribute('preview_state', 'preview')
     }
 }
 
@@ -17,11 +40,14 @@ function buildPostTags(tags){
 
 
 function buildHTML(post){
-    path = `/static/upload_folder/articles/${post['post_id']}.pdf`
+    path = `/static/upload_folder/previews/${post['post_id']}.jpeg`
     html = `<div class="content-post-container">
-                <iframe src="${path}" class='post-iframe'></iframe>
+                <iframe src="${path}" class='post-iframe' preview_state='preview' id='post-iframe-${post['post_id']}'></iframe>
                 <div class='content-post-info'>
-                    <h3>${post['title']}</h3>
+                <button id='toggle-preview-button-${post['post_id']}' class='toggle-preview-button' title='Toggle preview'>
+                    <i class="fa-solid fa-layer-group"></i>
+                </button>
+                    <h3 class='content-post-title'>${post['title']}</h3>
                     <p>${post['made_ago_str']}</p>
                     <div class='content-post-info-grid'>
                         <p class='post-info'>Views</p><div class="post-info-number">${post['views_amount'] || 0}</div>
@@ -43,9 +69,10 @@ function buildHTML(post){
                         <button class='modify-properties-button'title="This feature is currently unavailable." disabled>
                             Change properties
                         </button>
-                        <button onclick="deletePostDialog(${post['post_id']})" class='delete-post-button'>
+                        <button class='delete-post-button' id='delete-post-button-${post['post_id']}'>
                             Delete
                         </button>
+                    </div>
                 </div>
             </div>`;
     return html
