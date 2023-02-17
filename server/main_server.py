@@ -1,6 +1,5 @@
 from typing import Union
 from threading import Thread
-from datetime import datetime
 
 from flask import render_template, request, url_for, redirect, Response, session
 from flask_login import logout_user
@@ -21,21 +20,18 @@ from server.processes import search_for, check_password
 
 # add a way for users to delete their own posts and comments
 
+# notifications on personal page? / your comments on personal page?
+
 # Things that need fixing:
-#   1)User can have two personal page at once by just copy-pasting the link of his page
-#   or logging in as a different person. He might break system for himself in some
-#   cases.
-#   2)When calculating score by word appearances (while searching) only the last word in
+#   1)When calculating score by word appearances (while searching) only the last word in
 #   the request is counted, so the result can be inaccurate.
 #
 # Add a system of priority when approving posts for admins (some posts will be top
 # priority and examined as quick as possible, while other will have to wait in a queue)
 #
-# Add a window to show progress when uploading a file.
+# Add a window to show progress when uploading a file and registering.
 #
 # Add events system for handling registration, log in and other processes.
-#
-# Add likes, views.
 #
 # Add a way to copyright posts.
 #
@@ -47,9 +43,8 @@ from server.processes import search_for, check_password
 #  other user.
 #
 # Load developer studio page:
-#   Sort comments in dev studio by: Made on specific post; seen/verified/liked/replied
-#   (by author) already.
-#   Add content to fields such as analytics, translations, monetization etc.
+#   Sort comments in dev studio by: Made on specific post;
+#   Add content to translations, monetization, copyright.
 #
 # Post features:
 #   1)Add curse-comment ban system.
@@ -226,12 +221,10 @@ def add_comment() -> dict:
     adding a comment."""
     data = request.json
     post_id, comment_text, is_reply = get_request_data({'post_id': None, 'comment_text': None,
-                                                        'is_reply': None}, data)
+                                                        'is_reply': 0}, data)
     if not comment_text:
         return {}
-    write_comment(post_id, comment_text, is_reply)
-    return {'author': get_user().get_login, 'text': comment_text,
-            'date': datetime.now().strftime("%A, %d. %B %Y %H:%M")}
+    return write_comment(post_id, comment_text, is_reply)
 
 
 @app.route('/delete_comment/')
@@ -259,7 +252,19 @@ def delete_post():
 def ban_comment() -> Response:
     """Ban a comment under a post. This can function requires for user to be an author."""
     comment_id, reason = request.json.values()
-    get_user().author_ban_comment(app, comment_id, reason)
+    status = get_user().author_ban_comment(app, comment_id, reason)
+    if status:
+        return Response(status=403)
+    return Response(status=200)
+
+
+@app.route('/mark_comment_as_seen/', methods=['POST'])
+@author_required
+def mark_comment_as_seen() -> Response:
+    comment_id = request.json.get('comment_id')
+    status = get_user().mark_comment_as_seen(comment_id)
+    if status:
+        return Response(status=403)
     return Response(status=200)
 
 
@@ -298,11 +303,15 @@ def check_role() -> None:
 def upload_file() -> Response:
     """General function for starting the process
     of receiving a file from a user and saving it to the disk."""
-    file = request.files['file']
-    tags = request.values.get('tags')
+    try:
+        file = request.files['article']
+        preview = request.files['preview']
+        tags = request.values.get('tags')
+    except KeyError:
+        return Response('Something went wrong.', status=400)
     if not file or not tags:
         return Response('NO_DATA', status=400)
-    response = ArticleManager(file, get_user().get_user_id, tags).save()
+    response = ArticleManager(file, preview, get_user().get_user_id, tags).save()
     if isinstance(response, str):
         return Response(response, status=406)
     check_role()
@@ -342,6 +351,7 @@ def search() -> dict:
 
 
 @app.route('/search_page/', methods=['GET'])
+@login_required(session)
 def search_page() -> str:
     """Just renders the page where the search results will be displayed.
     This view does not do any searching. It passes the
@@ -377,7 +387,9 @@ def change_avatar() -> Response:
     """Function for changing the user's avatar. Receives the new avatar as a form data
     in the body of the request."""
     file = request.files['file']
-    ImageManager(file, get_user().get_user_id).save()
+    user_id = get_user().get_user_id
+    ImageManager(file, user_id).save()
+    get_user().update_avatar()
     return Response('SUCCESSFUL', 200)
 
 
@@ -402,4 +414,4 @@ def load_user(user_id: str):
         return None
 
 
-app.run(port=4000, debug=True, use_debugger=True, use_reloader=True)
+app.run(host='0.0.0.0', port=4000, debug=True, use_debugger=True, use_reloader=True)
