@@ -237,3 +237,18 @@ body{
     background-color: rgb(209, 43, 43);
     color: white;
 }
+
+#verify-post-button:disabled{
+    background-color: rgb(0 150 43 / 59%);
+    color: white;
+}
+
+#ban-post-button:disabled{
+    background-color: rgb(209 43 43 / 52%);
+    color: white;
+}
+
+#post-actions-wrapper > button:disabled:hover{
+    box-shadow: none;
+    cursor: default;
+}
