@@ -17,10 +17,11 @@ function banPost(post_id){
 
 function respond(status_message, action){
     console.log(status_message)
+    debugger
     const status = JSON.parse(status_message)['status']
     if (status == 'successful') {
-        verify_btn.disabled = true
-        ban_btn.disabled = true
+        document.getElementById('ban-post-button').disabled = true
+        document.getElementById('verify-post-button').disabled = true
         alert('Post '+ action +' successfully.')
     }
     else {
