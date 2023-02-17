@@ -12,7 +12,7 @@
 <body>
     <input type="checkbox" id="nav-toggle">
     <nav class="nav">
-        <label for="nav-toggle" class="nav-toggle" onclick id="open_tab_lb"></label>
+        <label for="nav-toggle" class="nav-toggle" id="open_tab_lb"></label>
 
         <div id="login-and-avatar-container">
             <h2 class="logo">{{session.get('login')}}</h2>
@@ -53,13 +53,26 @@
 
             <dialog id="upload_article_dlg">
                 <h2>Upload Article</h2>
-                <div id="upload_article">
-                    <label for="inp-file-content" class="article-file-label">
-                        Choose File
-                    </label>
-                    <p id="article-filename">No file selected.</p>
-                    <input type="file" name="file" placeholder="Select a file" id="inp-file-content">
+                <div id="upload-article-dialog-upload-files-section-wrapper">
+                    <div id="upload_article" class="upload-article-dialog-upload-file-wrapper">
+                        <h4>Article File</h4>
+                        <label for="inp-file-content" class="article-file-label">
+                            Choose File
+                        </label>
+                        <p id="article-filename" class="file-filename">No file selected.</p>
+                        <input type="file" name="file" placeholder="Select a file" id="inp-file-content">
+                    </div>
+    
+                    <div id="upload-article-dialog-upload-article-preview-wrapper" class="upload-article-dialog-upload-file-wrapper">
+                        <h4>Preview File</h4>
+                        <label for="upload-article-dialog-upload-article-preview-input" class="article-file-label">
+                            Choose File
+                        </label>
+                        <p id="preview-filename"  class="file-filename">No file selected.</p>
+                        <input type="file" name="file" placeholder="Select a file" id="upload-article-dialog-upload-article-preview-input">
+                    </div>
                 </div>
+                
                 <p>
                     Click the cross near the name of the science you want to add to post 
                     tags, or the checkmark to remove it from tags.
