@@ -5,86 +5,62 @@ var settings = {'page': 'subscription_page', 'posts_required': 5, 'posts_loaded'
 
 document.addEventListener('DOMContentLoaded', getPosts());
 
-function sendRequest(method, url, body) {
-    const headers = {'Content-Type': 'application/json'}
-    return fetch(url, {
-        method: method,
-        body: JSON.stringify(body),
-        headers: headers}).then(response => {
-        return response.text()
-    })
-}
-
 function getPosts(){
     sendRequest('POST', request_url, settings).then(resp => {
-        const posts_dict = JSON.parse(resp);
-        settings['posts_loaded'] += settings['posts_required']
-        buildPosts(posts_dict['dated_posts']);
+        const posts_dict = JSON.parse(resp)['dated_posts'];
+        settings['posts_loaded'] += posts_dict.length;
+        buildPosts(posts_dict);
     })
-}
-
-function buildTagsRepresentation(tags){
-    var repr = ''
-    for (i = 0; i<tags.length; i++){
-        repr += `<li>${tags[i]}</li>`
-    }
-    return repr
 }
 
 function buildPosts(posts){
+    if((settings['posts_loaded'] === 0) && (posts.length===0)){
+        insertHTML('#post_flow', '<h3 class="no-subscriptions-info">You are not subscribed to anybody yet.</h3>')
+        return false
+    }
     if (posts.length > 0){
         for (var i=0, l=Object.keys(posts).length; i<l; i++){
-            try{
-                if (settings['last_date'] != posts[i]['creation_date']){
-                    addHTML(`<h3 class="date-date-separator">${posts[i]['creation_date']}</h3>`)
-                    addHTML('<div class="ln-dates-sep"></div>')
-                    settings['last_date'] = posts[i]['creation_date']
-                }
-                post = buildHTML(posts[i]);
-                addHTML(post);
+            if (settings['last_date'] != posts[i]['creation_date']){
+                insertHTML('#post_flow', `<h3 class="date-date-separator">${posts[i]['creation_date']}</h3>`)
+                insertHTML('#post_flow', '<div class="ln-dates-sep"></div>')
+                settings['last_date'] = posts[i]['creation_date']
             }
-            catch(error){
-                console.log(error);
-            }
+            insertHTML('#post_flow', buildHTML(posts[i]));
         }
     }
 }
 
+function buildPostTags(tags){
+    html = ''
+    for (var i=0; i<tags.length; i++){
+        html+=`<li class='post-tag'>${tags[i]}</li>`
+    }
+    return html
+}
+
 function buildHTML(post){
-    path = `/static/upload_folder/articles/${post['post_id']}.pdf`
-    html = `<object class="table_cell">
-                <iframe class="preview" src="${path}"></iframe>
-                <div class='all-post-info'>
-                    <img class="author-avatar" src="/static/${post['author_avatar']}">
-                    <div class="post-short-information">
-                        <div class="title-and-author">
-                            <p class="post-name">
-                                <a href="/view_post/?post_id=${post['post_id']}">${post['title']}</a>
-                            </p>
-                            <p class="person_name">${post['author']}</p>
-                        </div>
-                        <p class="made-ago">${post['made_ago_str']}</p>
+    path = `/static/upload_folder/previews/${post['post_id']}.jpeg`
+    html = `<div class="content-post-container">
+                <iframe src="${path}" class='post-iframe'></iframe>
+                <div class='content-post-info'>
+                    <h3><a href="/view_post/?post_id=${post['post_id']}">${post['title']}</a></h3>
+                    <p>${post['made_ago_str']}</p>
+                    <div class='content-post-info-grid'>
+                        <p class='post-info'>Views</p><div class="post-info-number">${post['views_amount'] || 0}</div>
+                        <p class='post-info'>Likes</p><div class="post-info-number">${post['like_amounts'] || 0}</div>
+                        <p class='post-info'>Comments</p><div class="post-info-number">${post['comments_amount'] || 0}</div>
                     </div>
-                    <div class='post-tags'>
-                        <details>
-                            <summary>Post tags</summary>
+                    <div class='post-tags-wrapper'>
+                        <details class='post-tags-details'>
+                            <summary class='post-tags-summary'>
+                                Post Tags
+                            </summary>
                             <ul>
-                                ${buildTagsRepresentation(post['tags_flattened'])}
+                                ${buildPostTags(post['tags_flattened'])}
                             </ul>
                         </details>
                     </div>
                 </div>
-            </object>`
-            ;
+            </div>`;
     return html
 }
-
-function addHTML(html) {
-    const tab = document.getElementById('post_flow');
-    var template = document.createElement('template');
-    html = html.trim(); // Never return a text node of whitespace as the result
-    template.innerHTML = html;
-    tab.appendChild(template.content);
-    return template.content.firstChild;
-}
-
