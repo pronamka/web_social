@@ -37,7 +37,9 @@
             <input placeholder="password" type="password" class="info" id="password">
             <input placeholder="email" type="email" class="info" id="email">
             <button id="create-account-button">Register</button>
+            <p>Already have an account? <a id="log-in-transfer" onclick="window.location.href='/log_in_page'">Log In.</a></p>
             <p id="validation-errors-info"></p>
+            
         </div>
     </div>
     <script src="{{ url_for('static', filename='js/jquery.js')}}"></script>
