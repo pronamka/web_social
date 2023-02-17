@@ -132,6 +132,15 @@ details[id='details All interests']{
     overflow-y: scroll
 }
 
+details[id='details All interests']::-webkit-scrollbar{
+    width: 2px;
+}
+
+details[id='details All interests']::-webkit-scrollbar-corner{
+    nav-down: unset;
+    nav-up: unset;
+}
+
 summary[id='All interests']:hover{
     padding-bottom: 1vh;
     box-shadow: 2px 2px 8px 0px grey;
