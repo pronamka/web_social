@@ -164,3 +164,14 @@ body{
 	width: var(--credentials-input-width);
 	text-align: center;
 }
+
+#log-in-transfer{
+	text-decoration: wavy;
+	color: rgb(34, 97, 214);
+	cursor: pointer;
+}
+
+#log-in-transfer:hover{
+	color: rgb(0, 65, 184);
+	text-decoration:underline;
+}
