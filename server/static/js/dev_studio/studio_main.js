@@ -94,21 +94,27 @@ function loadHub(){
 }
 
 class ArticleUploadManager{
-    constructor(input_id){
-        this.file_data = document.getElementById(input_id).files[0]
+    constructor(){
+        this.article_data = document.getElementById('inp-file-content').files[0]
+        this.preview_data = document.getElementById('upload-article-dialog-upload-article-preview-input').files[0]
         this.file_article = new FormData()
     }
 
     fillFile(){
-        this.file_article.append('file', this.file_data)
-        this.file_article.append('filename', this.file_data['name'])
+        this.file_article.append('article', this.article_data)
+        this.file_article.append('article_filename', this.article_data['name'])
         this.file_article.append('tags', JSON.stringify(article_tags_manager.tags))
+    }
+
+    fillPreview(){
+        this.file_article.append('preview', this.preview_data)
+        this.file_article.append('previw_filename', this.preview_data['name'])
     }
 
     sendArticle(){
         fetch('/upload_file/', {method: 'POST', body: this.file_article, 
         headers: {'Accept': 'application/json'}}).then(response=>response.text()).then(resp=>{
-            alert(resp)
+            alert(resp, window.location.reload())
         })
     }
 }
@@ -120,8 +126,9 @@ function showUploadDialog () {
 }
 
 function uploadArticle(){
-    const manager = new ArticleUploadManager('inp-file-content')
+    const manager = new ArticleUploadManager()
     manager.fillFile()
+    manager.fillPreview()
     manager.sendArticle()
 }
 
@@ -203,7 +210,6 @@ class ArticleTagsManager{
         }
         var elems = parent.getElementsByClassName('interests selected')
         for (var i=0; i<elems.length; i++){
-            console.log(elems[i].getElementsByClassName('interest-status-mark'))
             elems[i].style.backgroundColor = 'lightcoral'
             elems[i].getElementsByClassName('interest-status-mark')[0].innerHTML = '&#x2717;'
         }
@@ -308,6 +314,7 @@ function displayInterests(interests, summary_name='Your interests', with_indexin
     return html
 }
 
+
 function loadAllInterests(){
     sendRequest('POST', '/load_info/', {'page': 'personal_data', 'all_interests': true}).then(resp => {
         resp = JSON.parse(resp)['interests']
@@ -318,14 +325,16 @@ function loadAllInterests(){
     })    
 }
 
-function displayFilename(){
-    var file_input = document.getElementById('inp-file-content').files
+
+function displayFilename(input_id='inp-file-content', label_id='article-filename'){
+    var file_input = document.getElementById(input_id).files
     if (file_input.length == 0){
-        document.getElementById('article-filename').innerText = 'No file selected'
+        document.getElementById(label_id).innerText = 'No file selected'
         return 0
     }
-    document.getElementById('article-filename').innerText = file_input[0].name
+    document.getElementById(label_id).innerText = file_input[0].name
 }
+
 
 function getTemplate(template_identifier){
     const elem = $.get('/static/js/dev_studio/templates.html', null, function(text){
@@ -370,7 +379,13 @@ document.addEventListener('DOMContentLoaded', loadContentPage);
 
 document.addEventListener('DOMContentLoaded', loadAllInterests)
 
-document.getElementById('inp-file-content').addEventListener('change', displayFilename)
+$('#inp-file-content').on('change', ()=>{
+    displayFilename('inp-file-content', 'article-filename')
+})
+
+$('#upload-article-dialog-upload-article-preview-input').on('change', ()=>{
+    displayFilename('upload-article-dialog-upload-article-preview-input', 'preview-filename')
+})
 
 
 //add an event listener for every tab button
