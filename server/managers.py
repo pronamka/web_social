@@ -124,13 +124,6 @@ class UserSubscriptionManager(UserManager):
 
     def __init__(self, user_id: int) -> None:
         super().__init__(user_id, 4)
-        self.followers, self.follows = self._get_followers_and_follows()
-
-    def _get_followers_and_follows(self) -> tuple:
-        """Get the ids of user's subscribers and the ids of users, that current user
-        is subscribed to."""
-        return self.database.get_all_singles(self.subscribers_query.format(author_id=self.user_id)), \
-            self.database.get_all_singles(self.subscribed_to_query.format(subscriber_id=self.user_id))
 
     def subscribe(self, user_id: int) -> None:
         self.database.insert(self.subscribe_request, data=(self.user_id, user_id,
@@ -142,8 +135,8 @@ class UserSubscriptionManager(UserManager):
 
     @property
     def get_followers(self) -> list:
-        return self.followers
+        return list(self.database.get_all_singles(self.subscribers_query.format(author_id=self.user_id)))
 
     @property
     def get_follows(self) -> tuple:
-        return tuple(self.follows)
+        return tuple(self.database.get_all_singles(self.subscribed_to_query.format(subscriber_id=self.user_id)))
