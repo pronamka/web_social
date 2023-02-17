@@ -82,13 +82,17 @@ class CommentsBuilder{
     }
 
     buildComment(comment_){
+
         const comment = new Comment(comment_)
         if (this.loaded_comments[comment.id] != undefined){
             return 
         }
-
-        this.loaded_comments[comment.id] = 1
-
+        try{
+            this.loaded_comments[`${comment.id}`] = 1
+        }
+        catch{
+            console.log(`Error on ${comment.id}`)
+        }
         insertHTML(this.status, this.buildCommentHTML(comment))
 
         this.addActionsToButtons(comment)
@@ -236,7 +240,8 @@ class CommentsTableBuilder{
             'object_id': comment_id, 
             'comments_required': this.comments_replies[comment_id]['comments_required'], 
             'comments_loaded': this.comments_replies[comment_id]['comments_loaded'], 
-            'object_type': 'reply'}
+            'object_type': 'reply',
+            'show_banned': true}
         
         return request_parameters
     }
@@ -405,6 +410,11 @@ function loadCommentsPage(){
     activateLoadMoreCommentsButtons()
 
     comments_table_builder.loadComments('unseen')
+}
+
+function changeWidth(){
+    const tab = document.getElementById('commentaries')
+    tab.style.width = `${tab.style.width-200}`
 }
 
 const comments_table_builder = new CommentsTableBuilder()
