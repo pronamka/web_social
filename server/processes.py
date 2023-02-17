@@ -324,10 +324,10 @@ class InformationGetter:
         return self.user.SubscriptionManager.get_followers
 
     def get_latest_comments_or_replies(self) -> list:
-        post_id, amount, start_with, content_type = \
+        post_id, amount, start_with, content_type, show_banned = \
             self._get_from_parameters({'object_id': 0, 'comments_required': 1,
-                                       'comments_loaded': 0, 'object_type': 'comment'})
-        return CommentsRegistry.fetch_(content_type, post_id, amount, start_with)
+                                       'comments_loaded': 0, 'object_type': 'comment', 'show_banned': False})
+        return CommentsRegistry.fetch_(content_type, post_id, amount, start_with, show_banned=show_banned)
 
     def get_latest_comments_on_users_posts(self) -> list:
         amount, start_with, status = self._get_from_parameters(
@@ -360,7 +360,9 @@ class InformationGetter:
         is subscribed to, sort them by date."""
         amount, start_with, post_type = self._get_from_parameters({'posts_required': 1, 'posts_loaded': 0,
                                                                    'post_type': 1})
-        follows = fol if len((fol := self.user.SubscriptionManager.get_follows)) >= 2 else list(fol).append(0)
+        follows = self.user.SubscriptionManager.get_follows
+        if len(follows) == 1:
+            follows = f'({follows[0]})'
         posts = UserPostRegistry.get_posts(amount, start_with, {'from_subscriptions': follows, 'verified': True},
                                            post_type=post_type)
         return posts
@@ -416,7 +418,7 @@ class LogInHandler(Manager):
         self.log_user()
 
     def log_user(self) -> tuple:
-        """General function that launches all the processes of logging in"""
+        """General function that launches all the processes of logging in."""
         self._check_properties()
         if self.status.value >= 4:
             self._log_in(self.login)
