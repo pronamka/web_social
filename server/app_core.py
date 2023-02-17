@@ -4,6 +4,8 @@ from ast import literal_eval
 from flask import Flask, session, abort
 from flask_login import LoginManager
 from flask_admin import Admin, AdminIndexView, expose
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from server.database import DataBase
 
@@ -13,6 +15,7 @@ app.config['SECRET_KEY'] = 'purple'  # need a better secret key
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 465
 app.config['MAIL_USE_SSL'] = True
+
 with open('server_settings.txt', mode='r') as settings_file:
     mail_settings: dict = literal_eval(settings_file.read()).get('mail_settings')
     if not mail_settings.get('STATUS', 0):
@@ -46,3 +49,7 @@ class AdminView(AdminIndexView):
 
 
 admin = Admin(app, name='WebSocial', index_view=AdminView())
+
+
+request_rate_limiter = Limiter(app=app, key_func=get_remote_address,
+                               default_limits=['3 per second', '60 per minute'])
