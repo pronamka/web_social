@@ -82,6 +82,10 @@ class User(UserMixin, ABC):
         return '/' + path if os.path.exists((path := f'static/avatar_images/{self.user_id}.jpeg')) \
             else '/static/avatar_images/0.jpeg'
 
+    def update_avatar(self) -> None:
+        self.avatar = '/' + path if os.path.exists((path := f'static/avatar_images/{self.user_id}.jpeg')) \
+            else '/static/avatar_images/0.jpeg'
+
     @property
     def get_user_id(self) -> int:
         return self.user_id
@@ -153,11 +157,14 @@ class Author(User):
     def send_notification(self, post_id: int, app) -> None:
         """Send notification about the new publication made to all of user's
         subscribers."""
+        recipients = self._get_followers_emails()
+        if not recipients:
+            return
         mail = Mail(app)
         article = FullyFeaturedPost(post_id)
         tags_info = f' about {", ".join(tags)}' if (tags := article.get_tags(True)) else ''
         message = Message(f'{self.login} released new article.',
-                          recipients=self._get_followers_emails())
+                          recipients=recipients)
         message.html = f'{self.login} released an article "{article.get_title}"{tags_info}'
         mail.send(message)
 
