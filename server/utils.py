@@ -52,7 +52,7 @@ def check_integrity(stream) -> bool:
 
 def get_text(name: str) -> str:
     """Get text from a pdf file saved on disk."""
-    doc = PdfFileReader(name)
+    doc = PdfFileReader(name, strict=False)
     text = ''
     for i in doc.pages:
         try:
@@ -119,8 +119,9 @@ class ArticleManager(FileManager):
     wkhtmltopdf_config = configuration(wkhtmltopdf='C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe')
     wkhtmltopdf_options = {'enable-local-file-access': True}
 
-    def __init__(self, file: FileStorage, user_id: int, tags) -> None:
+    def __init__(self, file: FileStorage, preview: FileStorage, user_id: int, tags) -> None:
         super(ArticleManager, self).__init__(file, user_id)
+        self.article_preview = preview
         self.full_path = None
         self.tags = tags
         self.protocols = {'pdf': self._immediate_save, 'docx': self._save_from,
@@ -140,6 +141,7 @@ class ArticleManager(FileManager):
         self.protocols.get(self._get_extension())()
         if error := self._insert_article_text():
             return error
+        ImageManager(self.article_preview, int(self.filename.rsplit('.')[0]), 'static/upload_folder/previews/').save()
 
     def _create_db_note(self) -> None:
         DataBase(access_level=2).insert(self.insert_article_request, data=self._build_data_package())
@@ -215,8 +217,10 @@ class ArticleManager(FileManager):
 class ImageManager(FileManager):
     """Class for converting images to jpeg and
     saving them with the right name."""
-    def __init__(self, file: FileStorage, user_id: int) -> None:
+    def __init__(self, file: FileStorage, user_id: int,
+                 path_to_save: str = 'static/avatar_images/') -> None:
         super(ImageManager, self).__init__(file, user_id)
+        self.path_to_save = path_to_save + '{filename}.jpeg'
 
     def _get_allowed_extensions(self) -> tuple:
         return 'jpeg', 'jpg', 'png'
@@ -229,7 +233,7 @@ class ImageManager(FileManager):
             # BytesIO passed to Image.open() allows to open to the image without first
             # saving it on the disk
             jpeg = image.convert('RGB')  # convert image into RGB representation
-            jpeg.save(f'static/avatar_images/{self.user_id}.jpeg')  # save the representation as jpeg
+            jpeg.save(self.path_to_save.format(filename=self.user_id))  # save the representation as jpeg
 
 
 class UsersObserver:
