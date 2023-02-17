@@ -40,7 +40,7 @@ function buildPostTags(tags){
 }
 
 function buildHTML(post){
-    path = `/static/upload_folder/articles/${post['post_id']}.pdf`
+    path = `/static/upload_folder/previews/${post['post_id']}.jpeg`
     html = `<div class="content-post-container">
                 <iframe src="${path}" class='post-iframe'></iframe>
                 <div class='content-post-info'>
