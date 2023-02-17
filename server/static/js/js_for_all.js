@@ -79,11 +79,10 @@ function insertHTML(direction, html) {
 
 
 function loadAvatar(){
-    sendRequest('POST', '/load_info/', {'page': 'personal_data'}).then(resp =>{
-    console.log(resp)
-        console.log(resp['avatar'])
-        document.getElementById('user_avatar_pic_img').innerHTML = `<img src="${JSON.parse(resp)['avatar']}" class="avatar"></img>`
-    })
+  sendRequest('POST', '/load_info/', {'page': 'personal_data'}).then(
+    resp =>{document.getElementById('user_avatar_pic_img').innerHTML = 
+    `<img src="${JSON.parse(resp)['avatar']}" class="avatar"></img>`
+  })
 }
 
 
