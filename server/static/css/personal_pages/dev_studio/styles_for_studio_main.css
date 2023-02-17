@@ -14,6 +14,11 @@ body{
 .tab-content{
     margin-left: 5vw;
     margin-top: 3vh;
+    width: 90vw;
+}
+
+[id='nav-toggle']:checked ~ main > article > .tab-content{
+    width: calc(90vw - 250px);
 }
 
 .tab-header{
@@ -25,6 +30,19 @@ input[type='file'] {
     left: -9999rem;
     display: none;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /* ARTICLE UPLOAD DIALOG */
@@ -44,7 +62,7 @@ input[type='file'] {
 
 #upload_article_dlg{
     width: 80vw;
-    max-height: 90vh;
+    max-height: 100vh;
     border: none;
     border-radius: 15px;
     outline: 1px solid grey;
@@ -56,13 +74,21 @@ input[type='file'] {
     overflow-x: hidden;
 }
 
-#upload_article{
-    width: 90%;
+.upload-article-dialog-upload-file-wrapper{
+    width: 45%;
+}
+
+#upload-article-dialog-upload-files-section-wrapper{
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    flex-direction: row;
+    justify-content: space-between;
 }
 
 .article-file-label {
     display: inline-block;
-    width: 30%;
+    width: 100%;
     max-width: 400px;
     border: none;
     outline: 1px solid grey;
@@ -76,10 +102,9 @@ input[type='file'] {
     padding-bottom: 1px;
 }
 
-#article-filename {
+.file-filename {
     margin-left: 2vw;
     font-size: larger;
-    display: inline-block;
 }
 
 #all_interests{
@@ -200,7 +225,7 @@ summary[id='All interests']:hover{
     outline: 1px solid gainsboro;
     outline-style: dashed;
     outline-offset: -2vh;
-    width: 50vw;
+    width: 60%;
     height: 75vh;
     display: inline-flex;
     vertical-align: top;
@@ -255,12 +280,12 @@ summary[id='All interests']:hover{
     display: inline-block;
     border: 1px solid gainsboro;
     background-color: white;
-    width: 30vw;
-    margin-left: 5vw;
+    width: 35%;
+    margin-left: 2%;
 }
 
 #overall-information{
-    padding: 2vw;;
+    padding: 2vw;
 }
 
 #account-analytics-header {
@@ -362,12 +387,15 @@ summary[id='All interests']:hover{
 
 
 @media(max-width: 1000px){
+    .tab-content{
+        margin-left: 7vw;
+    }
     #last_post{
-        width: 90vw;
+        width: 95%;
     }
     #short_analytics{
         display: block;
-        width: 90vw;
+        width: 95%;
         margin-left: 0px;
         margin-top: 3vh;
     }
@@ -440,8 +468,8 @@ summary[id='All interests']:hover{
 }
 
 .post-iframe{
-    width: 50vw;
-    max-width: 550px;
+    width: 40vw;
+    max-width: 622px;
     height: 80vh;
 }
 
@@ -450,6 +478,20 @@ summary[id='All interests']:hover{
     vertical-align: top;
     margin-left: 3vw;
     width: 30vw;
+}
+
+.toggle-preview-button{
+    background-color: transparent;
+    font-size: xx-large;
+    border: none;
+    display: inline-block;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.content-post-title{
+    display: inline-block;
+    vertical-align: middle;
 }
 
 .content-post-info-grid{
@@ -659,6 +701,14 @@ summary[id='All interests']:hover{
 
 /* Comment Section */
 
+[id='nav-toggle']:checked ~ main > article > .tab-content > #commentaries{
+    width: calc(90vw - 250px);
+}
+
+#commentaries{
+    width: 90vw;
+}
+
 .comments-table-tab{
     display: none
 }
@@ -678,7 +728,7 @@ summary[id='All interests']:hover{
     grid-column-gap: 2%;
     align-items: center;
     grid-column: 1/9;
-    max-width: 90vw;
+    max-width: 100%;
 }
 
 .load-replies-button{
@@ -750,7 +800,7 @@ summary[id='All interests']:hover{
 }
 
 .load-more-comments-main-button{
-    width: 90vw;
+    width: 100%;
 }
 
 .load-more-comments-main-button:hover{
@@ -758,7 +808,7 @@ summary[id='All interests']:hover{
 }
 
 .horizontal-line-separator{
-    width: 90vw;
+    width: 100%;
     border-bottom: 1px solid rgb(187 187 187);
     margin-top: 1vh;
     margin-bottom: 1vh;
@@ -775,7 +825,7 @@ summary[id='All interests']:hover{
     padding: 0;
     overflow: hidden;
     background-color: rgb(76 75 75);
-    width: 90vw;
+    width: 100%;
 }
 
 .comments-tables-navigation-tab-wrapper{
