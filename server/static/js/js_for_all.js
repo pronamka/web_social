@@ -47,6 +47,26 @@ function throttle(func, wait, options) {
     return throttled;
 }
 
+String.prototype.format = function () {
+  var i = 0, args = arguments;
+  return this.replace(/{}/g, function () {
+    return typeof args[i] != 'undefined' ? args[i++] : '';
+  });
+};
+
+
+class StringConstants{
+  get articleFilePath(){
+    return 'static/upload_folder/articles/{}.pdf'
+  }
+  get previewFilePath(){
+    return 'static/upload_folder/previews/{}.jpeg'
+  }
+}
+
+function getTemplate(template_identifier){
+  return templates.content.querySelector(template_identifier).cloneNode(true)
+}
 
 
 
@@ -77,6 +97,10 @@ function insertHTML(direction, html) {
   return template.content.firstChild;
 }
 
+function insertNode(direction, node){
+  document.querySelector(direction).appendChild(node)
+}
+
 
 function loadAvatar(){
   sendRequest('POST', '/load_info/', {'page': 'personal_data'}).then(
@@ -100,7 +124,6 @@ function search(){
     })`
 }
 
-
 function resizeTextArea(){
   this.style.height = 0;
   this.style.height = this.scrollHeight + 'px'
@@ -110,25 +133,34 @@ function closeDialog(){
   this.close()
 }
 
-var load_on_scroll_disabled = false
-
-var load_on_scroll = function(event) {
-    if (load_on_scroll_disabled == true){
-      return 0;
+function loadOnScroll(event){
+  if (load_on_scroll_disabled == true){
+    return 0;
+  }
+  if ((window.innerHeight+window.scrollY) >= document.body.offsetHeight-200){
+    try{
+      getPosts(2);
     }
-    if ((window.innerHeight+window.scrollY) >= document.body.offsetHeight-200){
-      try{
-        getPosts(2);
-      }
-      catch{
-        local_post_loading_function()
-      }
-    } }
-  
-document.addEventListener("scroll", throttle(load_on_scroll, 100));
+    catch{
+      local_post_loading_function()
+    }
+  }
+}
 
 
+let templates = ''
+fetch('http://192.168.0.249:4000/static/js/dev_studio/templates.html', {method: 'GET'}).then(
+  resp=>{return resp.text()}).then(
+    resp=>{
+      templates = document.createElement('template')
+      templates.innerHTML = resp
+    })
+
+const stringConstants = new StringConstants()
+var load_on_scroll_disabled = false
 var with_avatar = true
+
+document.addEventListener("scroll", throttle(loadOnScroll, 100));
 
 document.addEventListener('DOMContentLoaded', ()=>{
   if (with_avatar === false){
