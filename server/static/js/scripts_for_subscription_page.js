@@ -39,7 +39,22 @@ function buildPostTags(tags){
 }
 
 function buildHTML(post){
-    path = `/static/upload_folder/previews/${post['post_id']}.jpeg`
+    const path = stringConstants.previewFilePath.format(post['post_id'])
+
+    const post_template = getTemplate('#post-preview-frame-subscriptions-page')
+    post_template.querySelector('iframe').setAttribute('src', path)
+    const view_post_link = post_template.querySelector('a')
+
+    post_template.querySelector('.author-name').innerText = `by ${post['author']}`
+    post_template.querySelector('.made-ago').innerText = post['made_ago_str']
+    
+    view_post_link.setAttribute('href', `/view_post/?post_id=${post['post_id']}`)
+    view_post_link.innerText = post['title']
+
+    post_template.removeAttribute('id')
+    
+
+    
     html = `<div class="content-post-container">
                 <iframe src="${path}" class='post-iframe'></iframe>
                 <div class='content-post-info'>
