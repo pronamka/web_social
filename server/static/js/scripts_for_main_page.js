@@ -12,28 +12,30 @@ function getPosts(){
 
 function buildPosts(post_dict){
     for (var i=0, l=post_dict.length; i<l; i++){
-        insertHTML('#post_flow', buildHTML(post_dict[i]));
+        insertNode('#post_flow', buildHTML(post_dict[i]));
     }
 }
 
 
 function buildHTML(post){
-    path = `/static/upload_folder/previews/${post['post_id']}.jpeg`
-    html = `<object class="table_cell">
+    const path = stringConstants.previewFilePath.format(post['post_id'])
 
-                <iframe class="preview" src=${path} id="post_preview ${post['post_id']}"></iframe>
-                <div class="post-short-information">
-                    <div class='title-and-avatar-wrapper'>
-                        <img class="author-avatar" src="static/${post['author_avatar']}">
-                        <p class="post-name">
-                            <a href="/view_post/?post_id=${post['post_id']}" class="post-link" id="post ${post['post_id']}">${post['title']}</a>
-                        </p>
-                    </div>
-                    <p class="author-name">by ${post['author']}</p>
-                </div>
-            </object>`
-            ;
-    return html
+    const post_template = getTemplate('#post-preview-frame-main-page')
+    const post_iframe = post_template.querySelector('iframe')
+    const view_post_link = post_template.querySelector('a')
+
+    post_iframe.setAttribute('src', path)
+
+    post_template.querySelector('img').setAttribute('src', `static/${post['author_avatar']}`)
+    post_template.querySelector('.author-name').innerText = `by ${post['author']}`
+    
+    view_post_link.setAttribute('href', `/view_post/?post_id=${post['post_id']}`)
+    view_post_link.setAttribute('id', `view-post-link-post-${post['post_id']}`)
+    view_post_link.innerText = post['title']
+
+    post_template.removeAttribute('id')
+    
+    return post_template
 }
 
 const request_url = '/load_info/';
