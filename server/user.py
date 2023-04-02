@@ -23,7 +23,8 @@ class UserRole(Enum):
 
 class User(UserMixin, ABC):
     """Basic representation of a user.
-    :param data: a tuple of 5 (id, login, email_address, registration_date, status)"""
+    :param data: a tuple of 6 (id: int, login: str, email_address: str,
+        registration_date: str, status: int, interests: str (actually string representation of a dict))"""
 
     def __init__(self, data: tuple) -> None:
         self.user_id, self.login, self.email_address, self.register_date, self.status = data[:5]
@@ -66,7 +67,7 @@ class User(UserMixin, ABC):
 
     def remove_comment(self, comment_id: int) -> None:
         DataBase().execute_script(f'DELETE FROM comments WHERE comment_id={comment_id} AND user_id={self.user_id};'
-                                f'DELETE FROM comments WHERE is_reply={comment_id}')
+                                  f'DELETE FROM comments WHERE is_reply={comment_id}')
 
     @staticmethod
     def _get_time():
@@ -75,7 +76,7 @@ class User(UserMixin, ABC):
     def check_if_liked(self, post_id):
         query = f'SELECT user_id FROM post_likes WHERE ' \
                 f'user_id={self.user_id} AND post_id={post_id}'
-        res = DataBase(access_level=1).get_information(query, default=(0, ))
+        res = DataBase(access_level=1).get_information(query, default=(0,))
         return res
 
     def _get_avatar(self) -> str:
@@ -184,7 +185,8 @@ class Author(User):
         status that indicates that the comment is helpful/interesting."""
         database = DataBase(access_level=3)
         now = datetime.datetime.now()
-        data_package = [post_id, self.user_id, reply_text, now.strftime('%Y-%m-%d'), now.strftime('%A, %d. %B %Y %H:%M'),
+        data_package = [post_id, self.user_id, reply_text, now.strftime('%Y-%m-%d'),
+                        now.strftime('%A, %d. %B %Y %H:%M'),
                         comment_id, 1]
         database.insert(self.reply_sql, data=data_package)
         database.update(f'UPDATE comments SET status=2 WHERE comment_id="{comment_id}"')
